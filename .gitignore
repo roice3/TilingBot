@@ -1,0 +1,6 @@
+
+*.suo
+TilingBot/obj
+TilingBot/bin
+TilingBot/packages
+TilingBot/working
