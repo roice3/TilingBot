@@ -1,5 +1,6 @@
 ﻿namespace TilingBot
 {
+	using R3.Core;
 	using R3.Geometry;
 	using R3.Math;
 	using System;
@@ -19,15 +20,13 @@
 		private static string AccessToken = string.Empty;
 		private static string AccessTokenSecret = string.Empty;
 
-		private static TwitterService service = new TwitterService( ConsumerKey, ConsumerKeySecret, AccessToken, AccessTokenSecret );
-
 		static DateTime m_timestamp;
 
 		static void Main( string[] args )
 		{
 			m_timestamp = DateTime.Now;
-			ReadTwitterKeys();
-
+			
+			// Make the tiling.
 			Tiler.Settings settings = MakeTiling();
 
 			// Archive it.
@@ -41,8 +40,10 @@
 			SaveSettings( settings, settingsPath );
 
 			// Tweet it.
+			ReadTwitterKeys();
+			TwitterService service = new TwitterService( ConsumerKey, ConsumerKeySecret, AccessToken, AccessTokenSecret );
 			String message = FormatTweet( settings );
-			//SendTweet( message, newPath );
+			SendTweet( service, message, newPath );
 
 			//Console.Read();
 		}
@@ -95,12 +96,46 @@
 			return rand.NextDouble() > 0.5;
 		}
 
+		private static bool RandBoolBiasTrue( Random rand, double factor )
+		{
+			return rand.NextDouble() * factor > 0.5;
+		}
+
 		private static int RandPQ( Random rand )
 		{
 			// Weight smaller values more.
 			double d = rand.NextDouble();
 			int min = 3;
-			return (int)(min + Math.Pow( d, 3 ) * 13);
+			return (int)(min + Math.Pow( d, 2.5 ) * 17);
+		}
+
+		private static double RandDouble( Random rand, double low, double high )
+		{
+			double r = rand.NextDouble();
+			return low + r * (high - low);
+		}
+
+		private static Color RandColor( Random rand )
+		{
+			double hue = rand.NextDouble() * 360;
+			double sat = RandDouble( rand, .4, .9 );
+			double lum = RandDouble( rand, .2, .9 );
+			Vector3D rgb = ColorUtil.CHSL2RGB( new Vector3D( hue, sat, lum ) );
+			rgb *= 255;
+			return Color.FromArgb( 255, (int)rgb.X, (int)rgb.Y, (int)rgb.Z );
+		}
+
+		private static void InputsTesting( Tiler.Settings settings )
+		{
+			settings.P = 7;
+			settings.Q = 3;
+			settings.Active = new int[] { 0, 1 };
+			settings.ShowCoxeter = true;
+			settings.Mobius = Mobius.Identity();
+			settings.Colors = new Color[] {
+				Color.FromArgb( unchecked((int)4288984284) ),
+				Color.FromArgb( unchecked((int)4283970203) ),
+				Color.FromArgb( unchecked((int)4279345479) ) };
 		}
 
 		private static void RandomizeInputs( Tiler.Settings settings )
@@ -128,37 +163,48 @@
 			m.Isometry( settings.Geometry, a, c );
 			settings.Mobius = m;
 
-			// More ideas for variability, roughly prioritized
-			// - Random colors
-			// - Including Coxeter complex or not
-			// - Include non-uniform choices (i.e. pick a random point in fundamental domain)
-			// - Ideal tilings
-			// - Duals to uniforms
+			List<Color> colors = new List<Color>();
+			for( int i=0; i<3; i++ )
+				colors.Add( RandColor( rand ) );
+			settings.Colors = colors.ToArray();
 
-			settings.FileName = FormatFileName() + ".png";
+			settings.ShowCoxeter = RandBoolBiasTrue( rand, 3 );
+
+			// More ideas for variability, roughly prioritized
+			// - Show dots for vertices
+			// - Edge thickness, or even showing edges or not
+			// - Change displayed model
+			// - Ideal tilings
+			// - B&W
+			// - Other decorations (e.g. set of random points inside fundamental domain)
+			// - Include non-uniform choices (i.e. pick a random point in fundamental domain)
+			// - More than one uniform on a single tiling?
+			// - Duals to uniforms
 		}
 
 		private static Tiler.Settings MakeTiling()
 		{
 			// Standard inputs.
-			int size = 200;
+			int size = 1200;
 			Tiler.Settings settings = new Tiler.Settings()
 			{
 				Width = size,
 				Height = size,
+				FileName = FormatFileName() + ".png"
 			};
 
 			RandomizeInputs( settings );
+			//InputsTesting( settings );	// Uncomment to set some standard values.
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
-				settings.Bounds = 8;
+				settings.Bounds = 6;
 				break;
 			case Geometry.Euclidean:
-				settings.Bounds = 4;
+				settings.Bounds = 2;
 				break;
 			case Geometry.Hyperbolic:
-				settings.Bounds = 1.1;
+				settings.Bounds = 1.01;
 				break;
 			}
 			settings.Init();
@@ -174,13 +220,13 @@
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
-				tilingType = "#Hyperbolic";
+				tilingType = "#Spherical";
 				break;
 			case Geometry.Euclidean:
 				tilingType = "#Euclidean";
 				break;
 			case Geometry.Hyperbolic:
-				tilingType = "#Spherical";
+				tilingType = "#Hyperbolic";
 				break;
 			}
 
@@ -189,11 +235,12 @@
 				string.Join( ",", settings.Active ),
 				settings.Active.Length > 1 ? "are" : "is" );
 
-			return string.Format( "{0} tiling with {{{1},{2}}} symmetry. {3}",
+			return string.Format( "{0} #tiling with {{{1},{2}}} #symmetry. {3}",
 				tilingType, settings.P, settings.Q , activeString );
 		}
 
-		private static void SendTweet( string message, string imagePath )
+		// Thanks to tutorial here: https://www.youtube.com/watch?v=n2FadWBTL9E
+		private static void SendTweet( TwitterService service, string message, string imagePath )
 		{
 			using( FileStream stream = new FileStream( imagePath, FileMode.Open ) )
 			{

@@ -31,10 +31,17 @@
 			[DataMember]
 			public Mobius Mobius { get; set; }
 
+			[DataMember]
+			public Color[] Colors { get; set; }
+
+			[DataMember]
+			public bool ShowCoxeter { get; set; }
+
 			public int Width { get; set; }
 			public int Height { get; set; }
 			public double Bounds { get; set; }
 			public CircleNE[] Mirrors { get; set; }   // in conformal model
+			public Vector3D[] Verts { get; set; }
 			public string FileName { get; set; }
 			public bool Antialias { get; set; }
 			public double ColorScaling { get; set; }    // Depth to cycle through one hexagon
@@ -63,15 +70,18 @@
 				}
 			}
 
+			public Vector3D StartingPoint { get; set; }
+			public Mobius StartingPointMobius { get; set; }
+
 			public EdgeInfo[] UniformEdges { get; set; }
 
 			public void Init()
 			{
-				var verts = CalcMirrors();
-				CalcEdges( verts );
+				CalcMirrors();
+				CalcEdges();
 			}
 
-			private Vector3D[] CalcMirrors()
+			private void CalcMirrors()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
 
@@ -103,18 +113,17 @@
 					new CircleNE( circles[1], verts[1] ),
 					new CircleNE( circles[2], verts[2] ),
 				};
-
 				for( int i=0; i<3; i++ )
 					Mirrors[i].CenterNE = Mirrors[i].ReflectPoint( Mirrors[i].CenterNE );
 
-				return verts;
+				Verts = verts;
 			}
 
-			private void CalcEdges( Vector3D[] verts )
+			private void CalcEdges()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
 
-				List<int[]> activeSet = new List<int[]>();
+				List<int[]> activeSet = new List<int[]>();	// Do I really want to support multiple of these?
 				//activeSet.Add( new int[] { 0 } );
 				//activeSet.Add( new int[] { 1 } );
 				//activeSet.Add( new int[] { 2 } );
@@ -127,8 +136,14 @@
 				List<EdgeInfo> edges = new List<EdgeInfo>();
 				foreach( int[] active in activeSet )
 				{
-					var starting = IterateToStartingPoint( g, Mirrors, verts, active );
+					var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
 					Vector3D startingPoint = starting.Item1;
+
+					// Cache it. This is not actually global at the level of settings, so we may need to adjust in the future.
+					StartingPoint = startingPoint;
+					Mobius m = new Mobius();
+					m.Isometry( g, 0, -StartingPoint );
+					StartingPointMobius = m;
 
 					List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
 					foreach( int a in active )
@@ -266,6 +281,67 @@
 
 				return new Tuple<Vector3D,Vector3D>( toConformal( kleinVerts, bary ), bary );
 			}
+
+			/// <summary>
+			/// NOTE: Only searches active vertices.
+			/// </summary>
+			public int ClosestVertIndex( Vector3D test )
+			{
+				double min = double.MaxValue;
+				int result = 0;
+				foreach( int idx in Active )
+				{
+					Vector3D testV = Verts[idx];
+					double dist = double.MaxValue;
+					switch( this.Geometry )
+					{
+					case Geometry.Spherical:
+						dist = Spherical2D.SDist( test, testV );
+						break;
+					case Geometry.Euclidean:
+						dist = test.Dist( testV );
+						break;
+					case Geometry.Hyperbolic:
+						dist = H3Models.Ball.HDist( test, testV );
+						break;
+					}
+
+					if( dist < min )
+					{
+						min = dist;
+						result = idx;
+					}
+				}
+
+				return result;
+			}
+
+			public int VertColorIndex( Vector3D test )
+			{
+				EdgeInfo ei = UniformEdges[0];
+				var edges = UniformEdges[0].Edges;
+				if( edges.Length == 1 )
+					return 0;
+
+				// We need to go through the edges in CCW order.
+				// ZZZ - Performance: should be moved to an outer loop.
+				List<int> testOrder = new List<int>();
+				for( int i = 0; i < edges.Length; i++ )
+					testOrder.Add( i );
+				testOrder = testOrder.OrderBy( i => ei.Angles[i] ).ToList();
+
+				// Once we are to the right of an edge, we return that index.
+				foreach( var i in testOrder )
+				{
+					double a = ei.AngleTo( Geometry, test, i );
+					if( a < 0 )
+						return i;
+				}
+
+				// If we make it here, we were left of all edges
+				// In this case, return the first index.
+				return testOrder[0];
+			}
 		}
 
 		public class EdgeInfo
@@ -275,6 +351,7 @@
 
 			// Mobius transforms that will take the first edge point to the origin.
 			// This is to ease the calculation of distances to an edge.
+			// ZZZ - may be able to simplify (will the same for all edges for a given set of active mirrors)
 			public Mobius[] Mobii;
 			public double[] Angles;
 
@@ -297,17 +374,6 @@
 				Angles = angles.ToArray();
 			}
 
-			public bool SameSide( Geometry g, Vector3D p )
-			{
-				for( int i = 0; i < Edges.Length; i++ )
-				{
-					if( SameSide( g, p, Edges[i], Mobii[i], Angles[i] ) )
-						return true;
-				}
-
-				return false;
-			}
-
 			public static bool SameSide( Geometry g, Vector3D p, H3.Cell.Edge e, Mobius m, double a )
 			{
 				p = m.Apply( p );
@@ -319,16 +385,20 @@
 			{
 				for( int i = 0; i < Edges.Length; i++ )
 				{
-					if( PointWithinDist( g, p, Edges[i], Mobii[i], Angles[i] ) )
+					if( PointWithinDist( g, p, i ) )
 						return true;
 				}
 
 				return false;
 			}
 
-			public static bool PointWithinDist( Geometry g, Vector3D p, H3.Cell.Edge e, Mobius m, double a )
+			public bool PointWithinDist( Geometry g, Vector3D p, int edgeIdx )
 			{
-				double cutoff = 0.025;
+				H3.Cell.Edge e = Edges[edgeIdx];
+				Mobius m = Mobii[edgeIdx];
+				double a = Angles[edgeIdx];
+
+				double cutoff = 0.025;	// Make configurable.
 
 				p = m.Apply( p );
 
@@ -345,7 +415,7 @@
 				double midAbs = g == Geometry.Hyperbolic ?
 					DonHatch.h2eNorm( DonHatch.e2hNorm( end.Abs() ) / 2 ) :
 					Spherical2D.s2eNorm( Spherical2D.e2sNorm( end.Abs() ) / 2 );
-				//if( p.Abs() > midAbs )
+				//if( p.Abs() > midAbs )	// Not actually a good check.
 				//	return false;
 
 				p.RotateXY( -a );
@@ -354,6 +424,26 @@
 				double d;
 				H3Models.Ball.DupinCyclideSphere( p, cutoff, g, out cen, out d );
 				return d > Math.Abs( cen.Y );
+			}
+
+			private static double ClampAngle( double a )
+			{
+				double result = a % 2 * Math.PI;
+				if( result < 0 )
+					result += 2 * Math.PI;
+				return result;
+			}
+
+			public double AngleTo( Geometry g, Vector3D p, int edgeIdx )
+			{
+				H3.Cell.Edge e = Edges[edgeIdx];
+				Mobius m = Mobii[edgeIdx];
+				double a = Angles[edgeIdx];
+
+				p = m.Apply( p );
+
+				double pAngle = Euclidean2D.AngleToCounterClock( new Vector3D( 1, 0 ), p );
+				return pAngle - a;
 			}
 		}
 
@@ -474,8 +564,7 @@
 			if( !ReflectToFundamental( settings, ref v, ref flips, allFlips ) )
 				return Color.White;
 
-			//return Color.Black;
-			return ColorFunc( settings, v, flips, allFlips, settings.P, settings.Q, settings.ColorScaling );
+			return ColorFunc( settings, v, flips, allFlips );
 		}
 
 		/// <summary>
@@ -557,39 +646,26 @@
 			return false;
 		}
 
-		private static Color ColorFunc( Settings settings, Vector3D v, int[] flips, List<int> allFlips, int P, int Q, double colorScaling )
+		private static Color ColorFunc( Settings settings, Vector3D v, int[] flips, List<int> allFlips)
 		{
 			int reflections = flips.Sum();
 
 			List<Color> colors = new List<Color>();
-			bool within = false, sameSide = false;
+			bool within = false;
 			foreach( var edgeInfo in settings.UniformEdges )
 			{
-				within = edgeInfo.PointWithinDist( Geometry2D.GetGeometry( P, Q ), v );
+				within = edgeInfo.PointWithinDist( settings.Geometry, v );
 				if( within )
 				{
-					//colors.Add( edgeInfo.Color );
-					//colors.Add( Color.Blue );
-					//colors.Add( ColorTranslator.FromHtml( "#375e97" ) );
 					for( int i = 0; i < 2; i++ )
 						colors.Add( ColorTranslator.FromHtml( "#2a3132" ) );
 				}
 
-				sameSide = edgeInfo.SameSide( Geometry2D.GetGeometry( P, Q ), v );
-				if( sameSide )
-					//colors.Add( Color.LightSeaGreen );
-					//colors.Add( Color.CornflowerBlue );
-					//colors.Add( ColorTranslator.FromHtml( "#763626" ) );
-					colors.Add( ColorTranslator.FromHtml( "#a43820" ) );
-				else
-					//colors.Add( Color.LightSkyBlue );
-					//colors.Add( Color.LightSkyBlue );
-					colors.Add( ColorTranslator.FromHtml( "#90afc5" ) );
+				int idx = settings.VertColorIndex( v );
+				colors.Add( settings.Colors[idx] );
 			}
 
-			Color coxeter = reflections % 2 == 0 ? Color.White : ColorTranslator.FromHtml( "#3f681c" );
-			int comp = sameSide ? 0 : 1;
-			if( !within && reflections % 2 == comp )
+			if( !within && reflections % 2 == 0 && settings.ShowCoxeter )
 				colors.Add( Color.White );
 
 			return AvgColorSquare( colors );
