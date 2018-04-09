@@ -483,8 +483,12 @@
 							double ya = y /*- yoff/2*/ + l * yoff/div;
 							Vector3D v = new Vector3D( xa, ya );
 
-							v = ApplyTransformation( settings.Mobius, v );
-							Color color = CalcColor( settings, v );
+							Color color;
+							if( !OutsideBoundary( settings, v, out color ) )
+							{
+								v = ApplyTransformation( settings.Mobius, v );
+								color = CalcColor( settings, v );
+							}
 							colors.Add( color );
 						}
 
@@ -547,18 +551,30 @@
 				(int)(color.X * red.B + color.Y * green.B + color.Z * blue.B) );
 		}
 
-		private Color CalcColor( Settings settings, Vector3D v )
+		private bool OutsideBoundary( Settings settings, Vector3D v, out Color color )
 		{
 			if( settings.Geometry == Geometry.Hyperbolic )
 			{
 				if( v.Abs() > 1.00133 )
-					return Color.White;
+				{
+					color = Color.White;
+					return true;
+				}
 
 				bool limitSet = v.Abs() >= 1;
 				if( limitSet )
-					return Color.Black;
+				{
+					color = Color.Black;
+					return true;
+				}
 			}
 
+			color = Color.White;
+			return false;
+		}
+
+		private Color CalcColor( Settings settings, Vector3D v )
+		{
 			int[] flips = new int[3];
 			List<int> allFlips = new List<int>();
 			if( !ReflectToFundamental( settings, ref v, ref flips, allFlips ) )
