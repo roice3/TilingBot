@@ -14,10 +14,20 @@
 
 	public class Tiler
 	{
+		public Tiler()
+		{
+			m_ballToUHP.UpperHalfPlane();
+		}
+
 		[DataContract( Namespace = "" )]
 		public class Settings
 		{
-			public Settings() { Antialias = true; }
+			public Settings()
+			{
+				Antialias = true;
+				SphericalModel = SphericalModel.Sterographic;
+				HyperbolicModel = HyperbolicModel.Poincare;
+			}
 
 			[DataMember]
 			public int P;
@@ -33,6 +43,12 @@
 
 			[DataMember]
 			public Color[] Colors { get; set; }
+
+			[DataMember]
+			public SphericalModel SphericalModel { get; set; }
+
+			[DataMember]
+			public HyperbolicModel HyperbolicModel { get; set; }
 
 			[DataMember]
 			public bool ShowCoxeter { get; set; }
@@ -486,7 +502,7 @@
 							Color color;
 							if( !OutsideBoundary( settings, v, out color ) )
 							{
-								v = ApplyTransformation( settings.Mobius, v );
+								v = ApplyTransformation( v );
 								color = CalcColor( settings, v );
 							}
 							colors.Add( color );
@@ -512,11 +528,46 @@
 
 		/// <summary>
 		/// Using this to move the view around in interesting ways.
+		/// NOTE: Transformations here are applied in reverse.
 		/// </summary>
-		private Vector3D ApplyTransformation( Mobius m, Vector3D v )
+		private Vector3D ApplyTransformation( Vector3D v )
 		{
-			return m.Apply( v );
+			// Now, apply the model, which depends on the geometry.
+			switch( m_settings.Geometry )
+			{
+			case Geometry.Spherical:
+				break;
+			case Geometry.Euclidean:
+				break;
+			case Geometry.Hyperbolic:
+				{
+					switch( m_settings.HyperbolicModel )
+					{
+					case HyperbolicModel.Poincare:
+						break;
+					case HyperbolicModel.Klein:
+						v = HyperbolicModels.KleinToPoincare( v );
+						break;
+					case HyperbolicModel.UpperHalfPlane:
+						{
+							v.Y -= 1;
+							//v *= 5;	// Scaling doesn't really matter in UHS.
+							v = m_ballToUHP.Apply( v );
+							break;
+						}
+					}
+					break;
+				}
+			}
+
+			// Apply the random one.
+			Mobius m = m_settings.Mobius;
+			v = m.Apply( v );
+
+			return v;
 		}
+
+		private Mobius m_ballToUHP = new Mobius();
 
 		private readonly object m_lock = new object();
 
@@ -555,13 +606,17 @@
 		{
 			if( settings.Geometry == Geometry.Hyperbolic )
 			{
-				if( v.Abs() > 1.00133 )
+				double compare = v.Abs();
+				if( settings.HyperbolicModel == HyperbolicModel.UpperHalfPlane )
+					compare = v.Y;
+
+				if( compare > 1.00133 )
 				{
 					color = Color.White;
 					return true;
 				}
 
-				bool limitSet = v.Abs() >= 1;
+				bool limitSet = compare >= 1;
 				if( limitSet )
 				{
 					color = Color.Black;

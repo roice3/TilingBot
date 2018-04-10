@@ -1,4 +1,23 @@
-﻿namespace TilingBot
+﻿// Known Issues
+// - Coloring doesn't work right for rectifieds (because only one mirror is active, but there can be two tile types).
+//
+// TODO
+// - Better colors. Why do reds never show?
+// - Add better helper random methods, e.g. RandBool( 80% chance of true )
+//
+// More ideas for variability, roughly prioritized
+// - Show dots for vertices
+// - Edge thickness, or even showing edges or not
+// - Change displayed model
+// - Ideal tilings
+// - B&W
+// - Other decorations (e.g. set of random points inside fundamental domain)
+// - Include non-uniform choices (i.e. pick a random point in fundamental domain)
+// - More than one uniform on a single tiling?
+// - Duals to uniforms
+
+
+namespace TilingBot
 {
 	using R3.Core;
 	using R3.Geometry;
@@ -6,6 +25,7 @@
 	using System;
 	using System.Collections.Generic;
 	using System.IO;
+	using System.Linq;
 	using System.Numerics;
 	using System.Runtime.Serialization;
 	using System.Xml;
@@ -25,9 +45,14 @@
 		static void Main( string[] args )
 		{
 			m_timestamp = DateTime.Now;
-			
+
+			// Gen the settings.
+			Tiler.Settings settings = GenSettings();
+			String message = FormatTweet( settings );
+			Console.WriteLine( message );
+
 			// Make the tiling.
-			Tiler.Settings settings = MakeTiling();
+			MakeTiling( settings );
 
 			// Archive it.
 			string imagePath = settings.FileName;
@@ -39,11 +64,11 @@
 			settingsPath = Path.Combine( WorkingDir, settingsPath );
 			SaveSettings( settings, settingsPath );
 
-			// Tweet it.
+			// Tweet it, but only if we aren't testing!
 			ReadTwitterKeys();
 			TwitterService service = new TwitterService( ConsumerKey, ConsumerKeySecret, AccessToken, AccessTokenSecret );
-			String message = FormatTweet( settings );
-			SendTweet( service, message, newPath );
+			if( !Test.IsTesting )
+				SendTweet( service, message, newPath );
 
 			//Console.Read();
 		}
@@ -125,19 +150,6 @@
 			return Color.FromArgb( 255, (int)rgb.X, (int)rgb.Y, (int)rgb.Z );
 		}
 
-		private static void InputsTesting( Tiler.Settings settings )
-		{
-			settings.P = 7;
-			settings.Q = 3;
-			settings.Active = new int[] { 0, 1 };
-			settings.ShowCoxeter = true;
-			settings.Mobius = Mobius.Identity();
-			settings.Colors = new Color[] {
-				Color.FromArgb( unchecked((int)4288984284) ),
-				Color.FromArgb( unchecked((int)4283970203) ),
-				Color.FromArgb( unchecked((int)4279345479) ) };
-		}
-
 		private static void RandomizeInputs( Tiler.Settings settings )
 		{
 			Random rand = new Random();
@@ -160,8 +172,26 @@
 			Mobius m = new Mobius();
 			Complex c = new Complex( rand.NextDouble() / 2, rand.NextDouble() / 2 );
 			double a = rand.NextDouble() * Math.PI;
-			m.Isometry( settings.Geometry, a, c );
+			m.Isometry( settings.Geometry, a, c ); // Could be cool to make the geometry arbitrary here (i.e. a spherical transformation applied to a euclidean tiling looks sweet).
 			settings.Mobius = m;
+
+			// Random model.
+			switch( settings.Geometry )
+			{
+			case Geometry.Spherical:
+				break;
+			case Geometry.Euclidean:
+				break;
+			case Geometry.Hyperbolic:
+				{
+					int model = rand.Next( 1, 3 );
+					if( model == 2 )
+						settings.HyperbolicModel = HyperbolicModel.Klein;
+					if( model == 3 )
+						settings.HyperbolicModel = HyperbolicModel.UpperHalfPlane;
+					break;
+				}
+			}
 
 			List<Color> colors = new List<Color>();
 			for( int i=0; i<3; i++ )
@@ -169,20 +199,9 @@
 			settings.Colors = colors.ToArray();
 
 			settings.ShowCoxeter = RandBoolBiasTrue( rand, 3 );
-
-			// More ideas for variability, roughly prioritized
-			// - Show dots for vertices
-			// - Edge thickness, or even showing edges or not
-			// - Change displayed model
-			// - Ideal tilings
-			// - B&W
-			// - Other decorations (e.g. set of random points inside fundamental domain)
-			// - Include non-uniform choices (i.e. pick a random point in fundamental domain)
-			// - More than one uniform on a single tiling?
-			// - Duals to uniforms
 		}
 
-		private static Tiler.Settings MakeTiling()
+		private static Tiler.Settings GenSettings()
 		{
 			// Standard inputs.
 			int size = 1200;
@@ -194,7 +213,7 @@
 			};
 
 			RandomizeInputs( settings );
-			//InputsTesting( settings );	// Uncomment to set some standard values.
+			Test.InputsTesting( settings );
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
@@ -209,9 +228,13 @@
 			}
 			settings.Init();
 
+			return settings;
+		}
+
+		private static void MakeTiling( Tiler.Settings settings )
+		{
 			Tiler tiler = new Tiler();
 			tiler.GenImage( settings );
-			return settings;
 		}
 
 		private static string FormatTweet( Tiler.Settings settings )
@@ -230,13 +253,77 @@
 				break;
 			}
 
-			string activeString = string.Format( "Mirror{0} {1} {2} active.",
-				settings.Active.Length > 1 ? "s" : string.Empty,
-				string.Join( ",", settings.Active ),
-				settings.Active.Length > 1 ? "are" : "is" );
+			string modelString = ModelString( settings );
+			string activeString = ActiveMirrorsString( settings );
+			return string.Format( "{0} #tiling with {{{1},{2}}} #symmetry, shown in the {3} model. {4}",
+				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ), modelString, activeString );
+		}
 
-			return string.Format( "{0} #tiling with {{{1},{2}}} #symmetry. {3}",
-				tilingType, settings.P, settings.Q , activeString );
+		private static string InfinitySafe( int i )
+		{
+			return i == -1 ? "∞" : i.ToString();
+		}
+
+		private static string ModelString( Tiler.Settings settings )
+		{
+			switch( settings.Geometry )
+			{
+			case Geometry.Spherical:
+				return "conformal";
+			case Geometry.Euclidean:
+				return "plane";
+			case Geometry.Hyperbolic:
+				{
+					switch( settings.HyperbolicModel )
+					{
+					case HyperbolicModel.Poincare:
+						return "Poincaré ball";
+					case HyperbolicModel.Klein:
+						return "Klein";
+					case HyperbolicModel.UpperHalfPlane:
+						return "upper half plane";
+					}
+					break;
+				}
+			}
+
+			throw new System.ArgumentException();
+		}
+
+		private static string ActiveMirrorsString( Tiler.Settings settings )
+		{
+			List<string> mirrorDesc = new List<string>();
+			foreach( int a in settings.Active )
+			{
+				switch( a )
+				{
+				case 0:
+					mirrorDesc.Add( "first" );
+					break;
+				case 1:
+					mirrorDesc.Add( "second" );
+					break;
+				case 2:
+					mirrorDesc.Add( "third" );
+					break;
+				}
+			}
+			string temp = mirrorDesc[0];
+			if( mirrorDesc.Count == 2 )
+				temp += "and" + mirrorDesc[1];
+			if( mirrorDesc.Count == 3 )
+				temp += ", " + mirrorDesc[1] + ", and" + mirrorDesc[2];
+
+			// Make first char uppercase.
+			temp = temp.First().ToString().ToUpper() + temp.Substring( 1 );
+
+			string of = "of the fundamental triangle";
+			string activeString = string.Format( "{0} mirror{1} active.", temp,
+				settings.Active.Length > 1 ? 
+					"s " + of + " are" : 
+					" "  + of + " is" );
+
+			return activeString;
 		}
 
 		// Thanks to tutorial here: https://www.youtube.com/watch?v=n2FadWBTL9E
