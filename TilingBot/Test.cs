@@ -19,7 +19,8 @@
 				return;
 
 			//FirstTweet( settings );
-			InfinityAndHyperbolicModels( settings );
+			//InfinityAndHyperbolicModels( settings );
+			NewColorFunc( settings );
 		}
 
 		private static void FirstTweet( Tiler.Settings settings )
@@ -46,6 +47,17 @@
 			settings.Colors = new Color[] {
 				Color.FromArgb( unchecked((int)4282022368) ),
 				Color.White, Color.White };
+		}
+
+		private static void NewColorFunc( Tiler.Settings settings )
+		{
+			settings.P = 3;
+			settings.Q = 9;
+			settings.Active = new int[] { 0, 1, 2 };
+			settings.ShowCoxeter = true;
+			settings.Mobius = Program.RandomMobius( settings.Geometry, new System.Random() );
+			settings.HyperbolicModel = HyperbolicModel.Klein;
+			settings.ColoringOption = 1;
 		}
 	}
 }

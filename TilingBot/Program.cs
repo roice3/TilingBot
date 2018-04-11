@@ -4,6 +4,9 @@
 // TODO
 // - Better colors. Why do reds never show?
 // - Add better helper random methods, e.g. RandBool( 80% chance of true )
+// - Non-triangular domains (see FB thread with Tom).
+// - More color functions
+// - Animations
 //
 // More ideas for variability, roughly prioritized
 // - Show dots for vertices
@@ -150,6 +153,17 @@ namespace TilingBot
 			return Color.FromArgb( 255, (int)rgb.X, (int)rgb.Y, (int)rgb.Z );
 		}
 
+		internal static Mobius RandomMobius( Geometry g, Random rand )
+		{
+			// Pick a random point to move to origin.
+			// Could be cool to make the geometry arbitrary here (i.e. a spherical transformation applied to a euclidean tiling looks sweet).
+			Mobius m = new Mobius();
+			Complex c = new Complex( rand.NextDouble() / 2, rand.NextDouble() / 2 );
+			double a = rand.NextDouble() * Math.PI;
+			m.Isometry( g, a, c );
+			return m;
+		}
+
 		private static void RandomizeInputs( Tiler.Settings settings )
 		{
 			Random rand = new Random();
@@ -168,12 +182,7 @@ namespace TilingBot
 				active.Add( 0 );
 			settings.Active = active.ToArray();
 
-			// Pick a random point to move to origin.
-			Mobius m = new Mobius();
-			Complex c = new Complex( rand.NextDouble() / 2, rand.NextDouble() / 2 );
-			double a = rand.NextDouble() * Math.PI;
-			m.Isometry( settings.Geometry, a, c ); // Could be cool to make the geometry arbitrary here (i.e. a spherical transformation applied to a euclidean tiling looks sweet).
-			settings.Mobius = m;
+			settings.Mobius = RandomMobius( settings.Geometry, rand );
 
 			// Random model.
 			switch( settings.Geometry )
@@ -310,18 +319,27 @@ namespace TilingBot
 			}
 			string temp = mirrorDesc[0];
 			if( mirrorDesc.Count == 2 )
-				temp += "and" + mirrorDesc[1];
+				temp += " and " + mirrorDesc[1];
 			if( mirrorDesc.Count == 3 )
-				temp += ", " + mirrorDesc[1] + ", and" + mirrorDesc[2];
+				temp = "All";
 
 			// Make first char uppercase.
 			temp = temp.First().ToString().ToUpper() + temp.Substring( 1 );
 
+			string uniformDesc = string.Empty;
+			if( mirrorDesc.Count == 3 )
+			{
+				uniformDesc = "omnitruncation";
+			}
+			if( !string.IsNullOrEmpty( uniformDesc ) )
+				uniformDesc = " (" + uniformDesc + ")";
+
 			string of = "of the fundamental triangle";
-			string activeString = string.Format( "{0} mirror{1} active.", temp,
+			string activeString = string.Format( "{0} mirror{1} active{2}.", temp,
 				settings.Active.Length > 1 ? 
 					"s " + of + " are" : 
-					" "  + of + " is" );
+					" "  + of + " is",
+				uniformDesc );
 
 			return activeString;
 		}

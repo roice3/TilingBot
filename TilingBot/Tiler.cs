@@ -27,6 +27,7 @@
 				Antialias = true;
 				SphericalModel = SphericalModel.Sterographic;
 				HyperbolicModel = HyperbolicModel.Poincare;
+				ColoringOption = 0;
 			}
 
 			[DataMember]
@@ -52,6 +53,9 @@
 
 			[DataMember]
 			public bool ShowCoxeter { get; set; }
+
+			[DataMember]
+			public int ColoringOption { get; set; }
 
 			public int Width { get; set; }
 			public int Height { get; set; }
@@ -129,7 +133,7 @@
 					new CircleNE( circles[1], verts[1] ),
 					new CircleNE( circles[2], verts[2] ),
 				};
-				for( int i=0; i<3; i++ )
+				for( int i = 0; i < 3; i++ )
 					Mirrors[i].CenterNE = Mirrors[i].ReflectPoint( Mirrors[i].CenterNE );
 
 				Verts = verts;
@@ -139,7 +143,7 @@
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
 
-				List<int[]> activeSet = new List<int[]>();	// Do I really want to support multiple of these?
+				List<int[]> activeSet = new List<int[]>();  // Do I really want to support multiple of these?
 				//activeSet.Add( new int[] { 0 } );
 				//activeSet.Add( new int[] { 1 } );
 				//activeSet.Add( new int[] { 2 } );
@@ -165,7 +169,7 @@
 					foreach( int a in active )
 					{
 						Vector3D reflected = Mirrors[a].ReflectPoint( startingPoint );
-						startingEdges.Add( new H3.Cell.Edge( startingPoint, reflected, order: false ) );	// CAN'T ORDER HERE!
+						startingEdges.Add( new H3.Cell.Edge( startingPoint, reflected, order: false ) );    // CAN'T ORDER HERE!
 					}
 
 					Vector3D color = starting.Item2;
@@ -177,7 +181,7 @@
 					e.PreCalc( g );
 			}
 
-			public Tuple<Vector3D,Vector3D> IterateToStartingPoint( Geometry g, CircleNE[] mirrors, Vector3D[] verts, int[] activeMirrors )
+			public Tuple<Vector3D, Vector3D> IterateToStartingPoint( Geometry g, CircleNE[] mirrors, Vector3D[] verts, int[] activeMirrors )
 			{
 				if( activeMirrors.Length == 1 )
 				{
@@ -185,9 +189,6 @@
 					color[activeMirrors[0]] = 1;
 					return new Tuple<Vector3D, Vector3D>( verts[activeMirrors[0]], color );
 				}
-
-				// We'll assume spherical otherwise.
-				bool hyperbolic = g == Geometry.Hyperbolic;
 
 				// We are minimizing the output of this function, 
 				// because we want all edge lengths to be as close as possible.
@@ -199,9 +200,21 @@
 					{
 						int m = activeMirrors[i];
 						Vector3D reflected = mirrors[m].ReflectPoint( v );
-						double dist = hyperbolic ?
-							H3Models.Ball.HDist( v, reflected ) :
-							Spherical2D.SDist( v, reflected );
+
+						double dist = 0;
+						switch( g )
+						{
+						case Geometry.Spherical:
+							dist = Spherical2D.SDist( v, reflected );
+							break;
+						case Geometry.Euclidean:
+							dist = v.Dist( reflected );
+							break;
+						case Geometry.Hyperbolic:
+							dist = H3Models.Ball.HDist( v, reflected );
+							break;
+						}
+
 						lengths.Add( dist );
 					}
 
@@ -214,9 +227,20 @@
 
 				// So that we can leverage Euclidean barycentric coordinates, we will first convert our simplex to the Klein model.
 				// We will need to take care to properly convert back to the Ball as needed.
-				Vector3D[] kleinVerts = verts.Select( v => hyperbolic ? 
-					HyperbolicModels.PoincareToKlein( v ) : 
-					SphericalModels.StereoToGnomonic( v ) ).ToArray();
+				Vector3D[] kleinVerts = verts.Select( v =>
+				{
+					switch( g )
+					{
+					case Geometry.Spherical:
+						return SphericalModels.StereoToGnomonic( v );
+					case Geometry.Euclidean:
+						return v;
+					case Geometry.Hyperbolic:
+						return HyperbolicModels.PoincareToKlein( v );
+					}
+
+					throw new System.ArgumentException();
+				} ).ToArray();
 
 				// Normalizing barycentric coords amounts to making sure the 4 coords add to 1.
 				Func<Vector3D, Vector3D> baryNormalize = b =>
@@ -235,10 +259,17 @@
 				Func<Vector3D[], Vector3D, Vector3D> toConformal = ( kv, b ) =>
 				{
 					Vector3D klein = baryToEuclidean( kv, b );
-					if( g == Geometry.Hyperbolic )
-						return HyperbolicModels.KleinToPoincare( klein );
-					else
+					switch( g )
+					{
+					case Geometry.Spherical:
 						return SphericalModels.GnomonicToStereo( klein );
+					case Geometry.Euclidean:
+						return klein;
+					case Geometry.Hyperbolic:
+						return HyperbolicModels.KleinToPoincare( klein );
+					}
+
+					throw new System.ArgumentException();
 				};
 
 				// Our starting barycentric coords (halfway between all active mirrors).
@@ -250,7 +281,8 @@
 				// For each iteration, we'll shrink this search offset.
 				// NOTE: I'm not actually sure that the starting offset and decrease factor I'm using
 				// guarantee convergence, but it seems to be working pretty well (even when varying these parameters).
-				double searchOffset = bary[activeMirrors[0]] / 1.3;
+				double factor = 1.5;
+				double searchOffset = bary[activeMirrors[0]] / factor;
 
 				double min = double.MaxValue;
 				int iterations = 1000;
@@ -285,7 +317,7 @@
 						break;
 					}
 
-					searchOffset /= 1.5;
+					searchOffset /= factor;
 				}
 
 				if( !Tolerance.Equal( min, 0.0, 1e-14 ) )
@@ -295,7 +327,7 @@
 					//throw new System.Exception( "Boo. We did not converge." );
 				}
 
-				return new Tuple<Vector3D,Vector3D>( toConformal( kleinVerts, bary ), bary );
+				return new Tuple<Vector3D, Vector3D>( toConformal( kleinVerts, bary ), bary );
 			}
 
 			/// <summary>
@@ -414,7 +446,7 @@
 				Mobius m = Mobii[edgeIdx];
 				double a = Angles[edgeIdx];
 
-				double cutoff = 0.025;	// Make configurable.
+				double cutoff = 0.025;  // Make configurable.
 
 				p = m.Apply( p );
 
@@ -483,7 +515,7 @@
 				if( row++ % 20 == 0 )
 					System.Console.WriteLine( string.Format( "Processing Line {0}", row ) );
 
-				for( int j=0; j<height; j++ )
+				for( int j = 0; j < height; j++ )
 				{
 					double x = -bounds + i * xoff;
 					double y = -bounds + j * yoff;
@@ -492,11 +524,11 @@
 					{
 						const int div = 3;
 						List<Color> colors = new List<Color>();
-						for( int k=0; k<=div; k++ )
-						for( int l=0; l<=div; l++ )
+						for( int k = 0; k <= div; k++ )
+						for( int l = 0; l <= div; l++ )
 						{
-							double xa = x /*- xoff/2*/ + k * xoff/div;
-							double ya = y /*- yoff/2*/ + l * yoff/div;
+							double xa = x /*- xoff/2*/ + k * xoff / div;
+							double ya = y /*- yoff/2*/ + l * yoff / div;
 							Vector3D v = new Vector3D( xa, ya );
 
 							Color color;
@@ -635,7 +667,15 @@
 			if( !ReflectToFundamental( settings, ref v, ref flips, allFlips ) )
 				return Color.White;
 
-			return ColorFunc( settings, v, flips, allFlips );
+			switch( settings.ColoringOption )
+			{
+			case 0:
+				return ColorFunc0( settings, v, flips, allFlips );
+			case 1:
+				return ColorFunc1( settings, v, flips, allFlips );
+			}
+
+			throw new System.ArgumentException( "Unknown Coloring Option." );
 		}
 
 		/// <summary>
@@ -695,7 +735,7 @@
 			int clean = 0;
 			while( true && iterationCount < m_maxIterations )
 			{
-				for( int i=0; i<mirrors.Length; i++ )
+				for( int i = 0; i < mirrors.Length; i++ )
 				{
 					CircleNE mirror = mirrors[i];
 					if( !ReflectAcrossMirror( mirror, ref v ) )
@@ -717,7 +757,7 @@
 			return false;
 		}
 
-		private static Color ColorFunc( Settings settings, Vector3D v, int[] flips, List<int> allFlips)
+		private static Color ColorFunc0( Settings settings, Vector3D v, int[] flips, List<int> allFlips )
 		{
 			int reflections = flips.Sum();
 
@@ -740,6 +780,28 @@
 				colors.Add( Color.White );
 
 			return AvgColorSquare( colors );
+		}
+
+		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, List<int> allFlips )
+		{
+			int reflections = flips.Sum();
+
+			List<Color> colors = new List<Color>();
+			foreach( var edgeInfo in settings.UniformEdges )
+			{
+				if( edgeInfo.PointWithinDist( settings.Geometry, v ) )
+				{
+					colors.Add( edgeInfo.Color );
+				}
+			}
+			if( colors.Count > 0 )
+				return AvgColor( colors );
+
+			Color whitish = ColorTranslator.FromHtml( "#F1F1F2" );
+			if( !settings.ShowCoxeter )
+				return whitish;
+
+			return reflections % 2 == 0 ? whitish : ColorTranslator.FromHtml( "#BCBABE" );
 		}
 	}
 }
