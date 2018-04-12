@@ -2,10 +2,10 @@
 
 A twitter bot that creates random 2-dimensional tilings.
 
-![alt text](https://raw.githubusercontent.com/roice3/TilingBot/master/733-110.png)
+![alt text](https://raw.githubusercontent.com/roice3/TilingBot/master/73-110.png)
 
-https://twitter.com/tilingbot
-https://twitter.com/roice713
+https://twitter.com/tilingbot  
+https://twitter.com/roice713  
 http://roice3.org/
 
 # Dependencies
