@@ -1,23 +1,27 @@
 ﻿// Known Issues
 // - Coloring doesn't work right for rectifieds (because only one mirror is active, but there can be two tile types).
 //
-// TODO
-// - Better colors. Why do reds never show?
-// - Add better helper random methods, e.g. RandBool( 80% chance of true )
+// Things to work on
+// - Better colors. Why do reds seem to rarely get picked? More color functions.
 // - Non-triangular domains (see FB thread with Tom).
-// - More color functions
 // - Animations
+// - Random dots or patterns in fundamental domain.
+// - Leverage the list of reflections (e.g. color things like in MagicTile).
+// - Snubs, duals to uniforms, etc.
+// - Display settings in console output.
 //
 // More ideas for variability, roughly prioritized
 // - Show dots for vertices
-// - Edge thickness, or even showing edges or not
+// - Edge thickness, or even showing edges or not. Similar with vertices. (maybe if verts are smaller than edges, they could be subtracted out?)
 // - Change displayed model
 // - Ideal tilings
 // - B&W
 // - Other decorations (e.g. set of random points inside fundamental domain)
 // - Include non-uniform choices (i.e. pick a random point in fundamental domain)
 // - More than one uniform on a single tiling?
-// - Duals to uniforms
+//
+// Fun ideas
+// - Pixellated.
 
 
 namespace TilingBot
@@ -49,7 +53,7 @@ namespace TilingBot
 		{
 			m_timestamp = DateTime.Now;
 
-			// Gen the settings.
+			// Generate the random settings.
 			Tiler.Settings settings = GenSettings();
 			String message = FormatTweet( settings );
 			Console.WriteLine( message );
@@ -124,9 +128,14 @@ namespace TilingBot
 			return rand.NextDouble() > 0.5;
 		}
 
-		private static bool RandBoolBiasTrue( Random rand, double factor )
+		private static bool RandBoolWeighted( Random rand, double fractionTrue )
 		{
-			return rand.NextDouble() * factor > 0.5;
+			return rand.NextDouble() <= fractionTrue;
+		}
+
+		private static int RandIntWeighted( Random rand )
+		{
+			throw new System.NotImplementedException();
 		}
 
 		private static int RandPQ( Random rand )
@@ -159,7 +168,8 @@ namespace TilingBot
 			// Could be cool to make the geometry arbitrary here (i.e. a spherical transformation applied to a euclidean tiling looks sweet).
 			Mobius m = new Mobius();
 			Complex c = new Complex( rand.NextDouble() / 2, rand.NextDouble() / 2 );
-			double a = rand.NextDouble() * Math.PI;
+			double a = g == Geometry.Euclidean ? // I don't really like how the rotations look in the Euclidean case.
+				0 : rand.NextDouble() * Math.PI;
 			m.Isometry( g, a, c );
 			return m;
 		}
@@ -170,6 +180,9 @@ namespace TilingBot
 
 			int p = RandPQ( rand );
 			int q = RandPQ( rand );
+
+			// Pick certain geometries some percentage of the time.
+			// Otherwise, we tend to overwhelmingly get hyperbolic tilings.
 
 			settings.P = p;
 			settings.Q = q;
@@ -198,6 +211,8 @@ namespace TilingBot
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
 						settings.HyperbolicModel = HyperbolicModel.UpperHalfPlane;
+					if( model == 4 )
+						settings.HyperbolicModel = HyperbolicModel.Hyperboloid;	// We'll throw on the z coordinate in this case, i.e. orthographic.
 					break;
 				}
 			}
@@ -206,14 +221,15 @@ namespace TilingBot
 			for( int i=0; i<3; i++ )
 				colors.Add( RandColor( rand ) );
 			settings.Colors = colors.ToArray();
+			settings.ColoringOption = RandBoolWeighted( rand, .8 ) ? 0 : 1;
 
-			settings.ShowCoxeter = RandBoolBiasTrue( rand, 3 );
+			settings.ShowCoxeter = RandBoolWeighted( rand, .7 );
 		}
 
 		private static Tiler.Settings GenSettings()
 		{
 			// Standard inputs.
-			int size = 1200;
+			int size = Test.IsTesting ? 400 : 1200;
 			Tiler.Settings settings = new Tiler.Settings()
 			{
 				Width = size,
@@ -291,6 +307,8 @@ namespace TilingBot
 						return "Klein";
 					case HyperbolicModel.UpperHalfPlane:
 						return "upper half plane";
+					case HyperbolicModel.Hyperboloid:
+						return "orthographic";
 					}
 					break;
 				}
@@ -326,14 +344,7 @@ namespace TilingBot
 			// Make first char uppercase.
 			temp = temp.First().ToString().ToUpper() + temp.Substring( 1 );
 
-			string uniformDesc = string.Empty;
-			if( mirrorDesc.Count == 3 )
-			{
-				uniformDesc = "omnitruncation";
-			}
-			if( !string.IsNullOrEmpty( uniformDesc ) )
-				uniformDesc = " (" + uniformDesc + ")";
-
+			string uniformDesc = UniformDesc( settings );
 			string of = "of the fundamental triangle";
 			string activeString = string.Format( "{0} mirror{1} active{2}.", temp,
 				settings.Active.Length > 1 ? 
@@ -342,6 +353,38 @@ namespace TilingBot
 				uniformDesc );
 
 			return activeString;
+		}
+
+		private static string UniformDesc( Tiler.Settings settings )
+		{
+			var m = settings.Active;
+
+			string uniformDesc = string.Empty;
+			if( m.Length == 3 )
+			{
+				uniformDesc = "omnitruncation";
+			}
+			if( m.Length == 2 )
+			{
+				int m1 = m[0], m2 = m[1];
+				if( m1 == 0 && m2 == 1 )
+				{
+					uniformDesc = "truncation";
+				}
+				else if( m1 == 1 && m2 == 2 )
+				{
+					uniformDesc = "bitruncation";
+				}
+				else if( m1 == 0 && m2 == 2 )
+				{
+					uniformDesc = "cantellation";
+				}
+			}
+
+			if( !string.IsNullOrEmpty( uniformDesc ) )
+				uniformDesc = " (" + uniformDesc + ")";
+
+			return uniformDesc;
 		}
 
 		// Thanks to tutorial here: https://www.youtube.com/watch?v=n2FadWBTL9E
