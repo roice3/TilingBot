@@ -13,7 +13,7 @@
 // More ideas for variability, roughly prioritized
 // - Show dots for vertices
 // - Edge thickness, or even showing edges or not. Similar with vertices. (maybe if verts are smaller than edges, they could be subtracted out?)
-// - Change displayed model
+// - Change displayed model. UHS for Euclidean.
 // - Ideal tilings
 // - B&W
 // - Other decorations (e.g. set of random points inside fundamental domain)
@@ -360,11 +360,19 @@ namespace TilingBot
 			var m = settings.Active;
 
 			string uniformDesc = string.Empty;
-			if( m.Length == 3 )
+
+			if( m.Length == 1 )
 			{
-				uniformDesc = "omnitruncation";
+				if( m[0] == 1 )
+				{
+					uniformDesc = "rectification";
+				}
+				if( m[0] == 2 )
+				{
+					uniformDesc = "dual tiling";
+				}
 			}
-			if( m.Length == 2 )
+			else if( m.Length == 2 )
 			{
 				int m1 = m[0], m2 = m[1];
 				if( m1 == 0 && m2 == 1 )
@@ -379,6 +387,10 @@ namespace TilingBot
 				{
 					uniformDesc = "cantellation";
 				}
+			}
+			else if( m.Length == 3 )
+			{
+				uniformDesc = "omnitruncation";
 			}
 
 			if( !string.IsNullOrEmpty( uniformDesc ) )
