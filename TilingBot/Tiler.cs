@@ -25,6 +25,9 @@
 			public Settings()
 			{
 				Antialias = true;
+
+				EdgeWidth = 0.025;
+				VertexWidth = EdgeWidth * 4.0;
 				SphericalModel = SphericalModel.Sterographic;
 				HyperbolicModel = HyperbolicModel.Poincare;
 				ColoringOption = 0;
@@ -40,10 +43,13 @@
 			public int[] Active { get; set; }
 
 			[DataMember]
-			public Mobius Mobius { get; set; }
+			public double EdgeWidth { get; set; }
 
 			[DataMember]
-			public Color[] Colors { get; set; }
+			public double VertexWidth { get; set; }
+
+			[DataMember]
+			public Mobius Mobius { get; set; }
 
 			[DataMember]
 			public SphericalModel SphericalModel { get; set; }
@@ -57,6 +63,9 @@
 			[DataMember]
 			public int ColoringOption { get; set; }
 
+			[DataMember]
+			public Color[] Colors { get; set; }
+
 			public int Width { get; set; }
 			public int Height { get; set; }
 			public double Bounds { get; set; }
@@ -64,7 +73,6 @@
 			public Vector3D[] Verts { get; set; }
 			public string FileName { get; set; }
 			public bool Antialias { get; set; }
-			public double ColorScaling { get; set; }    // Depth to cycle through one hexagon
 
 			public Geometry Geometry
 			{
@@ -110,19 +118,20 @@
 				Segment seg = baseTile.Boundary.Segments[0];
 
 				// Order needs to match mirrors.
+				// Order is mirrors opposite: vertex, edge, center.
 				Vector3D[] verts = new Vector3D[]
 				{
-					new Vector3D(),
-					seg.Midpoint,
 					seg.P1,
+					seg.Midpoint,
+					new Vector3D(),
 				};
 
 				// The unoriented mirrors.
 				Circle[] circles = new Circle[]
 				{
-					seg.Type == SegmentType.Arc ? new Circle( seg.P1, seg.Midpoint, seg.P2 ) : new Circle( verts[1], verts[2] ),	// Arc or Line
-					new Circle( verts[0], verts[2] ),	// Line
-					new Circle( verts[0], verts[1] ),	// Line
+					new Circle( verts[2], verts[1] ),	// Line
+					new Circle( verts[2], verts[0] ),	// Line
+					seg.Type == SegmentType.Arc ? new Circle( seg.P1, seg.Midpoint, seg.P2 ) : new Circle( verts[1], verts[0] ),	// Arc or Line
 				};
 
 				// The oriented mirrors.
@@ -429,48 +438,41 @@
 				return p.Y > 0;
 			}
 
-			public bool PointWithinDist( Geometry g, Vector3D p )
+			public bool PointWithinDist( Settings settings, Vector3D p )
 			{
 				for( int i = 0; i < Edges.Length; i++ )
 				{
-					if( PointWithinDist( g, p, i ) )
+					if( PointWithinDist( settings, p, i ) )
 						return true;
 				}
 
 				return false;
 			}
 
-			public bool PointWithinDist( Geometry g, Vector3D p, int edgeIdx )
+			public bool PointWithinDist( Settings settings, Vector3D p, int edgeIdx )
 			{
 				H3.Cell.Edge e = Edges[edgeIdx];
 				Mobius m = Mobii[edgeIdx];
 				double a = Angles[edgeIdx];
 
-				double cutoff = 0.025;  // Make configurable.
+				double cutoff = settings.EdgeWidth;
 
 				p = m.Apply( p );
 
 				// Dots near the starting point.
-				//if( p.Abs() < cutoff * 4 )
-				//return true;
+				if( p.Abs() < settings.VertexWidth )
+					return true;
 
 				// Same side as endpoint?
 				Vector3D end = m.Apply( e.End );
 				if( p.AngleTo( end ) > Math.PI / 2 )
 					return false;
 
-				// Beyond the midpoint?
-				double midAbs = g == Geometry.Hyperbolic ?
-					DonHatch.h2eNorm( DonHatch.e2hNorm( end.Abs() ) / 2 ) :
-					Spherical2D.s2eNorm( Spherical2D.e2sNorm( end.Abs() ) / 2 );
-				//if( p.Abs() > midAbs )	// Not actually a good check.
-				//	return false;
-
 				p.RotateXY( -a );
 
 				Vector3D cen;
 				double d;
-				H3Models.Ball.DupinCyclideSphere( p, cutoff, g, out cen, out d );
+				H3Models.Ball.DupinCyclideSphere( p, cutoff, settings.Geometry, out cen, out d );
 				return d > Math.Abs( cen.Y );
 			}
 
@@ -765,7 +767,7 @@
 			bool within = false;
 			foreach( var edgeInfo in settings.UniformEdges )
 			{
-				within = edgeInfo.PointWithinDist( settings.Geometry, v );
+				within = edgeInfo.PointWithinDist( settings, v );
 				if( within )
 				{
 					for( int i = 0; i < 2; i++ )
@@ -789,7 +791,7 @@
 			List<Color> colors = new List<Color>();
 			foreach( var edgeInfo in settings.UniformEdges )
 			{
-				if( edgeInfo.PointWithinDist( settings.Geometry, v ) )
+				if( edgeInfo.PointWithinDist( settings, v ) )
 				{
 					colors.Add( edgeInfo.Color );
 				}
