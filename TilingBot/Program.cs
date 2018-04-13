@@ -280,7 +280,7 @@ namespace TilingBot
 
 			string modelString = ModelString( settings );
 			string activeString = ActiveMirrorsString( settings );
-			return string.Format( "{0} #tiling with {{{1},{2}}} #symmetry, shown in the {3} model. {4}",
+			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown in the {3} model. {4}",
 				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ), modelString, activeString );
 		}
 
