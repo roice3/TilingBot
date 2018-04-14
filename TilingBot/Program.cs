@@ -1,24 +1,24 @@
 ﻿// Known Issues
-// - Coloring doesn't work right for rectifieds (because only one mirror is active, but there can be two tile types).
+// - Iterating to starting point doesn't always converge, which could cause missed tweets.
 //
 // Things to work on
-// - Better colors. Why do reds seem to rarely get picked? More color functions.
-// - Non-triangular domains (see FB thread with Tom).
+// - Better colors. Why do reds seem to rarely get picked? More color functions. Same saturation/intensity for all color choices?
 // - Animations
-// - Random dots or patterns in fundamental domain.
-// - Leverage the list of reflections (e.g. color things like in MagicTile).
+// - Leverage the list of reflections to color cosets (e.g. like in MagicTile).
 // - Snubs, duals to uniforms, etc.
 // - Display settings in console output.
+// - Non-triangular domains (see FB thread with Tom).
+// - Links to wiki pages (would require ensuring redirect links for wiki pages existed).
 //
 // More ideas for variability, roughly prioritized
-// - Show dots for vertices
+// - Cell, edge, or vertex centered.
 // - Edge thickness, or even showing edges or not. Similar with vertices. (maybe if verts are smaller than edges, they could be subtracted out?)
 // - Change displayed model. UHS for Euclidean.
-// - Ideal tilings
+// - Bounds
 // - B&W
+// - More than one uniform on a single tiling?
 // - Other decorations (e.g. set of random points inside fundamental domain)
 // - Include non-uniform choices (i.e. pick a random point in fundamental domain)
-// - More than one uniform on a single tiling?
 //
 // Fun ideas
 // - Pixellated.
@@ -51,6 +51,18 @@ namespace TilingBot
 
 		static void Main( string[] args )
 		{
+			try
+			{
+				BotWork();
+			}
+			catch( Exception e )
+			{
+				Console.WriteLine( "TilingBot malfunction! " + e.Message );
+			}
+		}
+
+		static void BotWork()
+		{
 			m_timestamp = DateTime.Now;
 
 			// Generate the random settings.
@@ -76,8 +88,6 @@ namespace TilingBot
 			TwitterService service = new TwitterService( ConsumerKey, ConsumerKeySecret, AccessToken, AccessTokenSecret );
 			if( !Test.IsTesting )
 				SendTweet( service, message, newPath );
-
-			//Console.Read();
 		}
 
 		static string FormatFileName()
@@ -242,7 +252,7 @@ namespace TilingBot
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
-				settings.Bounds = 6;
+				settings.Bounds = settings.SphericalModel == SphericalModel.Sterographic ? 6 : 2;
 				break;
 			case Geometry.Euclidean:
 				settings.Bounds = 2;
@@ -278,6 +288,18 @@ namespace TilingBot
 				break;
 			}
 
+			/*
+			From Tom Ruen...
+			For right angle domains, you might consider these names for tilings. 
+			{p,q} = {p,q}_100
+			t{p,q} = {p,q}_110 (truncated)
+			2t{p,q} = t{p,q} = {p,q}_011 (dual truncated or bitruncated)
+			r{p,q} = {p,q}_010 (rectified)
+			rr{p,q} = {p,q}_101 (double-rectified or cantellated)
+			tr{p,q} = {p,q}_111 (Omnitruncated)
+			s{p,q} = htr{p,qP = h{p,q}_111 (snub)
+			*/
+
 			string modelString = ModelString( settings );
 			string activeString = ActiveMirrorsString( settings );
 			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown in the {3} model. {4}",
@@ -294,7 +316,16 @@ namespace TilingBot
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
-				return "conformal";
+				{
+					switch( settings.SphericalModel )
+					{
+					case SphericalModel.Sterographic:
+						return "conformal (stereographic projection)";
+					case SphericalModel.Gnomonic:
+						return "gnomonic";
+					}
+					break;
+				}
 			case Geometry.Euclidean:
 				return "plane";
 			case Geometry.Hyperbolic:
@@ -404,6 +435,11 @@ namespace TilingBot
 		{
 			using( FileStream stream = new FileStream( imagePath, FileMode.Open ) )
 			{
+				// I wasted a bunch of time trying to get the call with a callback to the response working.
+				// There may be a bug in TweetSharp, because a low-level method didn't like that some of the 
+				// SendTweetWithMediaOptions member variables were null, even though they are clearly nullable by design.
+				// Compound this with the TweetSharp repo not being available (had to look through code on searchcode.com),
+				// and I really should switch this out with some other tweeting code in the future.
 				service.SendTweetWithMedia( new SendTweetWithMediaOptions()
 				{
 					Status = message,

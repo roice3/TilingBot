@@ -27,7 +27,7 @@
 				Antialias = true;
 
 				EdgeWidth = 0.025;
-				VertexWidth = EdgeWidth * 4.0;
+				VertexWidth = EdgeWidth;
 				SphericalModel = SphericalModel.Sterographic;
 				HyperbolicModel = HyperbolicModel.Poincare;
 				ColoringOption = 0;
@@ -377,8 +377,6 @@
 			{
 				EdgeInfo ei = UniformEdges[0];
 				var edges = UniformEdges[0].Edges;
-				if( edges.Length == 1 )
-					return 0;
 
 				// We need to go through the edges in CCW order.
 				// ZZZ - Performance: should be moved to an outer loop.
@@ -387,17 +385,14 @@
 					testOrder.Add( i );
 				testOrder = testOrder.OrderBy( i => ei.Angles[i] ).ToList();
 
-				// Once we are to the right of an edge, we return that index.
-				foreach( var i in testOrder )
+				for( int i=0; i<testOrder.Count; i++ )
 				{
-					double a = ei.AngleTo( Geometry, test, i );
+					double a = ei.AngleTo( Geometry, test, testOrder[i] );
 					if( a < 0 )
-						return i;
+						return testOrder[i];
 				}
 
-				// If we make it here, we were left of all edges
-				// In this case, return the first index.
-				return testOrder[0];
+				return testOrder.Count == 3 ? testOrder[0] : testOrder.Count;
 			}
 		}
 
@@ -474,14 +469,6 @@
 				double d;
 				H3Models.Ball.DupinCyclideSphere( p, cutoff, settings.Geometry, out cen, out d );
 				return d > Math.Abs( cen.Y );
-			}
-
-			private static double ClampAngle( double a )
-			{
-				double result = a % 2 * Math.PI;
-				if( result < 0 )
-					result += 2 * Math.PI;
-				return result;
 			}
 
 			public double AngleTo( Geometry g, Vector3D p, int edgeIdx )
@@ -570,7 +557,17 @@
 			switch( m_settings.Geometry )
 			{
 			case Geometry.Spherical:
-				break;
+				{
+					switch( m_settings.SphericalModel )
+					{
+					case SphericalModel.Sterographic:
+						break;
+					case SphericalModel.Gnomonic:
+						v = SphericalModels.GnomonicToStereo( v );
+						break;
+					}
+					break;
+				}
 			case Geometry.Euclidean:
 				break;
 			case Geometry.Hyperbolic:
