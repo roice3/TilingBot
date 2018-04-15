@@ -9,6 +9,7 @@
 // - Display settings in console output.
 // - Non-triangular domains (see FB thread with Tom).
 // - Links to wiki pages (would require ensuring redirect links for wiki pages existed).
+// - Refactor: publish R3.Core on Nuget: https://docs.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio
 //
 // More ideas for variability, roughly prioritized
 // - Cell, edge, or vertex centered.
@@ -216,13 +217,15 @@ namespace TilingBot
 				break;
 			case Geometry.Hyperbolic:
 				{
-					int model = rand.Next( 1, 3 );
+					int model = rand.Next( 1, 5 );
 					if( model == 2 )
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
 						settings.HyperbolicModel = HyperbolicModel.UpperHalfPlane;
 					if( model == 4 )
-						settings.HyperbolicModel = HyperbolicModel.Hyperboloid;	// We'll throw on the z coordinate in this case, i.e. orthographic.
+						settings.HyperbolicModel = HyperbolicModel.Band;
+					if( model == 5 )
+						settings.HyperbolicModel = HyperbolicModel.Orthographic;
 					break;
 				}
 			}
@@ -258,7 +261,13 @@ namespace TilingBot
 				settings.Bounds = 2;
 				break;
 			case Geometry.Hyperbolic:
-				settings.Bounds = 1.01;
+				settings.Bounds = settings.HyperbolicModel == HyperbolicModel.Orthographic ? 4 : 1.01;
+				if( settings.HyperbolicModel == HyperbolicModel.Band )
+				{
+					double factor = 1.5;
+					settings.Height = (int)(settings.Height / factor);
+					settings.Width = (int)(settings.Width * factor);
+				}
 				break;
 			}
 			settings.Init();
@@ -338,8 +347,10 @@ namespace TilingBot
 						return "Klein";
 					case HyperbolicModel.UpperHalfPlane:
 						return "upper half plane";
-					case HyperbolicModel.Hyperboloid:
-						return "orthographic";
+					case HyperbolicModel.Band:
+						return "band";
+					case HyperbolicModel.Orthographic:
+						return "orthographic hyperboloid";
 					}
 					break;
 				}

@@ -7,6 +7,7 @@
 	using System.Drawing;
 	using System.Drawing.Imaging;
 	using System.Linq;
+	using System.Numerics;
 	using System.Runtime.Serialization;
 	using System.Threading.Tasks;
 	using Color = System.Drawing.Color;
@@ -16,7 +17,6 @@
 	{
 		public Tiler()
 		{
-			m_ballToUHP.UpperHalfPlane();
 		}
 
 		[DataContract( Namespace = "" )]
@@ -373,7 +373,11 @@
 				return result;
 			}
 
-			public int VertColorIndex( Vector3D test )
+			/// <summary>
+			/// The goal of this method is to give a unique color for every face.
+			/// Unfortunately, it isn't working for rectified tilings right now.
+			/// </summary>
+			public int ColorIndexForPoint( Vector3D test )
 			{
 				EdgeInfo ei = UniformEdges[0];
 				var edges = UniformEdges[0].Edges;
@@ -392,7 +396,8 @@
 						return testOrder[i];
 				}
 
-				return testOrder.Count == 3 ? testOrder[0] : testOrder.Count;
+				return testOrder[0];
+				//return testOrder.Count == 3 ? testOrder[0] : testOrder.Count;	// Thought this fixed, but it breaks bitruncations.
 			}
 		}
 
@@ -424,13 +429,6 @@
 				}
 				Mobii = mobii.ToArray();
 				Angles = angles.ToArray();
-			}
-
-			public static bool SameSide( Geometry g, Vector3D p, H3.Cell.Edge e, Mobius m, double a )
-			{
-				p = m.Apply( p );
-				p.RotateXY( -a );
-				return p.Y > 0;
 			}
 
 			public bool PointWithinDist( Settings settings, Vector3D p )
@@ -583,9 +581,20 @@
 						{
 							v.Y -= 1;
 							//v *= 5;	// Scaling doesn't really matter in UHS.
-							v = m_ballToUHP.Apply( v );
+							v = HyperbolicModels.UpperToPoincare( v );
 							break;
 						}
+					case HyperbolicModel.Band:
+						{
+							v.X *= Math.Pow( 1.5, 2 );  // Magic number here must match height/width value in Program.cs.
+							Complex vc = v.ToComplex();
+							Complex result = (Complex.Exp( Math.PI * vc / 2 ) - 1) / (Complex.Exp( Math.PI * vc / 2 ) + 1);
+							v = Vector3D.FromComplex( result );
+							break;
+						}
+					case HyperbolicModel.Orthographic:
+						v = HyperbolicModels.OrthoToPoincare( v );
+						break;
 					}
 					break;
 				}
@@ -597,8 +606,6 @@
 
 			return v;
 		}
-
-		private Mobius m_ballToUHP = new Mobius();
 
 		private readonly object m_lock = new object();
 
@@ -633,13 +640,26 @@
 				(int)(color.X * red.B + color.Y * green.B + color.Z * blue.B) );
 		}
 
+		private bool DrawLimit( Settings settings )
+		{
+			if( settings.Geometry != Geometry.Hyperbolic )
+				return false;
+
+			if( settings.HyperbolicModel == HyperbolicModel.Orthographic )
+				return false;
+
+			return true;
+		}
+
 		private bool OutsideBoundary( Settings settings, Vector3D v, out Color color )
 		{
-			if( settings.Geometry == Geometry.Hyperbolic )
+			if( DrawLimit( settings ) )
 			{
 				double compare = v.Abs();
 				if( settings.HyperbolicModel == HyperbolicModel.UpperHalfPlane )
 					compare = v.Y;
+				if( settings.HyperbolicModel == HyperbolicModel.Band )
+					compare = Math.Abs( v.Y );
 
 				if( compare > 1.00133 )
 				{
@@ -711,7 +731,7 @@
 				}
 			}
 
-			System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
+			//System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
 			return false;
 		}
 
@@ -771,7 +791,7 @@
 						colors.Add( ColorTranslator.FromHtml( "#2a3132" ) );
 				}
 
-				int idx = settings.VertColorIndex( v );
+				int idx = settings.ColorIndexForPoint( v );
 				colors.Add( settings.Colors[idx] );
 			}
 
