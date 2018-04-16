@@ -252,16 +252,17 @@ namespace TilingBot
 
 			RandomizeInputs( settings );
 			Test.InputsTesting( settings );
+			double diskBounds = 1.01;
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
 				settings.Bounds = settings.SphericalModel == SphericalModel.Sterographic ? 6 : 2;
 				break;
 			case Geometry.Euclidean:
-				settings.Bounds = 2;
+				settings.Bounds = settings.EuclideanModel == EuclideanModel.Isometric ? 2 : diskBounds;
 				break;
 			case Geometry.Hyperbolic:
-				settings.Bounds = settings.HyperbolicModel == HyperbolicModel.Orthographic ? 4 : 1.01;
+				settings.Bounds = settings.HyperbolicModel == HyperbolicModel.Orthographic ? 4 : diskBounds;
 				if( settings.HyperbolicModel == HyperbolicModel.Band )
 				{
 					double factor = 1.5;
@@ -311,7 +312,7 @@ namespace TilingBot
 
 			string modelString = ModelString( settings );
 			string activeString = ActiveMirrorsString( settings );
-			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown in the {3} model. {4}",
+			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown in {3} model. {4}",
 				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ), modelString, activeString );
 		}
 
@@ -322,6 +323,8 @@ namespace TilingBot
 
 		private static string ModelString( Tiler.Settings settings )
 		{
+			string model = string.Empty;
+			string prefix = "the ";
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
@@ -329,34 +332,59 @@ namespace TilingBot
 					switch( settings.SphericalModel )
 					{
 					case SphericalModel.Sterographic:
-						return "conformal (stereographic projection)";
+						model = "conformal (stereographic projection)";
+						break;
 					case SphericalModel.Gnomonic:
-						return "gnomonic";
+						model = "gnomonic";
+						break;
 					}
 					break;
 				}
 			case Geometry.Euclidean:
-				return "plane";
+				{
+					switch( settings.EuclideanModel )
+					{
+					case EuclideanModel.Isometric:
+						model = "plane";
+						break;
+
+					// These next two aren't well known and I should come up with better names.
+					case EuclideanModel.Disk:
+						prefix = "a ";
+						model = "disk";
+						break;
+					case EuclideanModel.UpperHalfPlane:
+						prefix = "an ";
+						model = "upper half plane";
+						break;
+					}
+					break;
+				}
 			case Geometry.Hyperbolic:
 				{
 					switch( settings.HyperbolicModel )
 					{
 					case HyperbolicModel.Poincare:
-						return "Poincaré ball";
+						model = "Poincaré ball";
+						break;
 					case HyperbolicModel.Klein:
-						return "Klein";
+						model = "Klein";
+						break;
 					case HyperbolicModel.UpperHalfPlane:
-						return "upper half plane";
+						model = "upper half plane";
+						break;
 					case HyperbolicModel.Band:
-						return "band";
+						model = "band";
+						break;
 					case HyperbolicModel.Orthographic:
-						return "orthographic hyperboloid";
+						model = "orthographic";
+						break;
 					}
 					break;
 				}
 			}
 
-			throw new System.ArgumentException();
+			return prefix + model;
 		}
 
 		private static string ActiveMirrorsString( Tiler.Settings settings )

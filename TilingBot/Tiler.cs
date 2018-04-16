@@ -28,6 +28,7 @@
 
 				EdgeWidth = 0.025;
 				VertexWidth = EdgeWidth;
+				EuclideanModel = EuclideanModel.Isometric;
 				SphericalModel = SphericalModel.Sterographic;
 				HyperbolicModel = HyperbolicModel.Poincare;
 				ColoringOption = 0;
@@ -50,6 +51,9 @@
 
 			[DataMember]
 			public Mobius Mobius { get; set; }
+
+			[DataMember]
+			public EuclideanModel EuclideanModel { get; set; }
 
 			[DataMember]
 			public SphericalModel SphericalModel { get; set; }
@@ -542,6 +546,7 @@
 				}
 			} );
 
+			image.RotateFlip( RotateFlipType.RotateNoneFlipY );
 			image.Save( settings.FileName, ImageFormat.Png );
 		}
 
@@ -567,7 +572,20 @@
 					break;
 				}
 			case Geometry.Euclidean:
-				break;
+				{
+					switch( m_settings.EuclideanModel )
+					{
+					case EuclideanModel.Isometric:
+						return v;
+					case EuclideanModel.Disk:
+						v = EuclideanModels.DiskToIsometric( v );
+						break;
+					case EuclideanModel.UpperHalfPlane:
+						v = EuclideanModels.UpperHalfPlaneToIsometric( v );
+						break;
+					}
+					break;
+				}
 			case Geometry.Hyperbolic:
 				{
 					switch( m_settings.HyperbolicModel )
@@ -579,8 +597,6 @@
 						break;
 					case HyperbolicModel.UpperHalfPlane:
 						{
-							v.Y -= 1;
-							//v *= 5;	// Scaling doesn't really matter in UHS.
 							v = HyperbolicModels.UpperToPoincare( v );
 							break;
 						}
@@ -642,13 +658,26 @@
 
 		private bool DrawLimit( Settings settings )
 		{
-			if( settings.Geometry != Geometry.Hyperbolic )
+			if( settings.Geometry == Geometry.Euclidean )
+			{
+				if( settings.EuclideanModel == EuclideanModel.Isometric )
+					return false;
+				else
+					return true;
+			}
+
+			if( settings.Geometry == Geometry.Spherical )
 				return false;
 
-			if( settings.HyperbolicModel == HyperbolicModel.Orthographic )
-				return false;
+			if( settings.Geometry == Geometry.Hyperbolic )
+			{ 
+				if( settings.HyperbolicModel == HyperbolicModel.Orthographic )
+					return false;
+				else
+					return true;
+			}
 
-			return true;
+			throw new System.Exception( "Unhandled case in DrawLimit check." );
 		}
 
 		private bool OutsideBoundary( Settings settings, Vector3D v, out Color color )
@@ -656,10 +685,16 @@
 			if( DrawLimit( settings ) )
 			{
 				double compare = v.Abs();
-				if( settings.HyperbolicModel == HyperbolicModel.UpperHalfPlane )
-					compare = v.Y;
-				if( settings.HyperbolicModel == HyperbolicModel.Band )
-					compare = Math.Abs( v.Y );
+				if( settings.Geometry == Geometry.Euclidean &&
+					settings.EuclideanModel == EuclideanModel.UpperHalfPlane )
+					compare = -v.Y;
+				else if( settings.Geometry == Geometry.Hyperbolic )
+				{
+					if( settings.HyperbolicModel == HyperbolicModel.UpperHalfPlane )
+						compare = -v.Y;
+					else if( settings.HyperbolicModel == HyperbolicModel.Band )
+						compare = Math.Abs( v.Y );
+				}
 
 				if( compare > 1.00133 )
 				{
