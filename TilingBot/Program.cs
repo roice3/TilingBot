@@ -96,7 +96,7 @@ namespace TilingBot
 			return m_timestamp.ToString( "yyyy-M-dd_HH-mm-ss" );
 		}
 
-		static void SaveSettings( Tiler.Settings settings, string path )
+		internal static void SaveSettings( Tiler.Settings settings, string path )
 		{
 			XmlWriterSettings writerSettings = new XmlWriterSettings();
 			writerSettings.OmitXmlDeclaration = true;
@@ -105,6 +105,17 @@ namespace TilingBot
 			{
 				DataContractSerializer dcs = new DataContractSerializer( settings.GetType() );
 				dcs.WriteObject( writer, settings );
+			}
+		}
+
+		internal static Tiler.Settings LoadSettings( string path )
+		{
+			XmlReaderSettings readingSettings = new XmlReaderSettings();
+			readingSettings.IgnoreWhitespace = true;
+			using( var reader = XmlReader.Create( path, readingSettings ) )
+			{
+				DataContractSerializer dcs = new DataContractSerializer( typeof( Tiler.Settings ) );
+				return (Tiler.Settings)dcs.ReadObject( reader, verifyObjectName: false );
 			}
 		}
 
@@ -212,9 +223,21 @@ namespace TilingBot
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
-				break;
+				{
+					int model = rand.Next( 1, 2 );
+					if( model == 2 )
+						settings.SphericalModel = SphericalModel.Gnomonic;
+					break;
+				}
 			case Geometry.Euclidean:
-				break;
+				{
+					int model = rand.Next( 1, 3 );
+					if( model == 2 )
+						settings.EuclideanModel = EuclideanModel.Disk;
+					if( model == 3 )
+						settings.EuclideanModel = EuclideanModel.UpperHalfPlane;
+					break;
+				}
 			case Geometry.Hyperbolic:
 				{
 					int model = rand.Next( 1, 5 );
@@ -241,17 +264,17 @@ namespace TilingBot
 
 		private static Tiler.Settings GenSettings()
 		{
+			Tiler.Settings settings = new Tiler.Settings();
+			RandomizeInputs( settings );
+			Test.InputsTesting( ref settings );
+
 			// Standard inputs.
 			int size = Test.IsTesting ? 400 : 1200;
-			Tiler.Settings settings = new Tiler.Settings()
-			{
-				Width = size,
-				Height = size,
-				FileName = FormatFileName() + ".png"
-			};
+			settings.Antialias = true;
+			settings.Width = size;
+			settings.Height = size;
+			settings.FileName = FormatFileName() + ".png";
 
-			RandomizeInputs( settings );
-			Test.InputsTesting( settings );
 			double diskBounds = 1.01;
 			switch( settings.Geometry )
 			{
