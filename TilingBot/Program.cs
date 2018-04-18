@@ -54,7 +54,9 @@ namespace TilingBot
 		{
 			try
 			{
-				BotWork();
+				int batch = 1;
+				for( int i = 0; i < batch; i++ )
+					BotWork();
 			}
 			catch( Exception e )
 			{
@@ -70,25 +72,31 @@ namespace TilingBot
 			Tiler.Settings settings = GenSettings();
 			String message = FormatTweet( settings );
 			Console.WriteLine( message );
+			Console.WriteLine( string.Empty );
+			// ZZZ - output the settings.
 
 			// Make the tiling.
 			MakeTiling( settings );
 
 			// Archive it.
 			string imagePath = settings.FileName;
-			string newPath = Path.Combine( WorkingDir, imagePath );
+			string newPath = Path.Combine( Persistence.WorkingDir, imagePath );
 			File.Move( imagePath, newPath );
 
 			// Save settings for posterity.
 			string settingsPath = FormatFileName() + ".xml";
-			settingsPath = Path.Combine( WorkingDir, settingsPath );
-			SaveSettings( settings, settingsPath );
+			settingsPath = Path.Combine( Persistence.WorkingDir, settingsPath );
+			Persistence.SaveSettings( settings, settingsPath );
 
 			// Tweet it, but only if we aren't testing!
 			ReadTwitterKeys();
 			TwitterService service = new TwitterService( ConsumerKey, ConsumerKeySecret, AccessToken, AccessTokenSecret );
 			if( !Test.IsTesting )
+			{
 				SendTweet( service, message, newPath );
+
+				// Move to tweeted directory.
+			}
 		}
 
 		static string FormatFileName()
@@ -96,48 +104,9 @@ namespace TilingBot
 			return m_timestamp.ToString( "yyyy-M-dd_HH-mm-ss" );
 		}
 
-		internal static void SaveSettings( Tiler.Settings settings, string path )
-		{
-			XmlWriterSettings writerSettings = new XmlWriterSettings();
-			writerSettings.OmitXmlDeclaration = true;
-			writerSettings.Indent = true;
-			using( var writer = XmlWriter.Create( path, writerSettings ) )
-			{
-				DataContractSerializer dcs = new DataContractSerializer( settings.GetType() );
-				dcs.WriteObject( writer, settings );
-			}
-		}
-
-		internal static Tiler.Settings LoadSettings( string path )
-		{
-			XmlReaderSettings readingSettings = new XmlReaderSettings();
-			readingSettings.IgnoreWhitespace = true;
-			using( var reader = XmlReader.Create( path, readingSettings ) )
-			{
-				DataContractSerializer dcs = new DataContractSerializer( typeof( Tiler.Settings ) );
-				return (Tiler.Settings)dcs.ReadObject( reader, verifyObjectName: false );
-			}
-		}
-
-		public static string WorkingDir
-		{
-			get
-			{
-				string working = "working";
-				string current = Directory.GetCurrentDirectory();
-				string dir = Path.Combine( current, working );
-				if( Directory.Exists( dir ) )
-					return dir;
-
-				// Diff directory for development.
-				string dev = Directory.GetParent( current ).Parent.FullName;
-				return Path.Combine( dev, working );
-			}
-		}
-
 		private static void ReadTwitterKeys()
 		{
-			string keyFile = Path.Combine( WorkingDir, "keys.txt" );
+			string keyFile = Path.Combine( Persistence.WorkingDir, "keys.txt" );
 			string[] keys = File.ReadAllLines( keyFile );
 			ConsumerKey = keys[0];
 			ConsumerKeySecret = keys[1];
@@ -177,8 +146,8 @@ namespace TilingBot
 		private static Color RandColor( Random rand )
 		{
 			double hue = rand.NextDouble() * 360;
-			double sat = RandDouble( rand, .4, .9 );
-			double lum = RandDouble( rand, .2, .9 );
+			double sat = RandDouble( rand, .2, 1.0 );
+			double lum = RandDouble( rand, .2, 1.0 );
 			Vector3D rgb = ColorUtil.CHSL2RGB( new Vector3D( hue, sat, lum ) );
 			rgb *= 255;
 			return Color.FromArgb( 255, (int)rgb.X, (int)rgb.Y, (int)rgb.Z );
@@ -202,8 +171,10 @@ namespace TilingBot
 
 			int p = RandPQ( rand );
 			int q = RandPQ( rand );
+			if( q > 18 )
+				q = -1;	// Make q infinite 10% of the time.
 
-			// Pick certain geometries some percentage of the time.
+			// ZZZ - Pick certain geometries some percentage of the time.
 			// Otherwise, we tend to overwhelmingly get hyperbolic tilings.
 
 			settings.P = p;
@@ -217,6 +188,29 @@ namespace TilingBot
 				active.Add( 0 );
 			settings.Active = active.ToArray();
 
+			settings.EdgeWidth = RandDouble( rand, 0, .05 );
+			settings.VertexWidth = RandDouble( rand, 0, .1 );
+
+			int centering = rand.Next( 1, 6 );
+			switch( centering )
+			{
+			case 1:
+				settings.Centering = Tiler.Centering.General;
+				break;
+			case 2:
+				settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex1;
+				break;
+			case 3:
+				settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex2;
+				break;
+			case 4:
+				settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex3;
+				break;
+			case 5:
+				settings.Centering = Tiler.Centering.Vertex;
+				break;
+			}
+
 			settings.Mobius = RandomMobius( settings.Geometry, rand );
 
 			// Random model.
@@ -224,14 +218,14 @@ namespace TilingBot
 			{
 			case Geometry.Spherical:
 				{
-					int model = rand.Next( 1, 2 );
+					int model = rand.Next( 1, 3 );
 					if( model == 2 )
 						settings.SphericalModel = SphericalModel.Gnomonic;
 					break;
 				}
 			case Geometry.Euclidean:
 				{
-					int model = rand.Next( 1, 3 );
+					int model = rand.Next( 1, 4 );
 					if( model == 2 )
 						settings.EuclideanModel = EuclideanModel.Disk;
 					if( model == 3 )
@@ -240,7 +234,7 @@ namespace TilingBot
 				}
 			case Geometry.Hyperbolic:
 				{
-					int model = rand.Next( 1, 5 );
+					int model = rand.Next( 1, 6 );
 					if( model == 2 )
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
@@ -253,13 +247,13 @@ namespace TilingBot
 				}
 			}
 
+			settings.ShowCoxeter = RandBoolWeighted( rand, .7 );
+
 			List<Color> colors = new List<Color>();
 			for( int i=0; i<3; i++ )
 				colors.Add( RandColor( rand ) );
 			settings.Colors = colors.ToArray();
 			settings.ColoringOption = RandBoolWeighted( rand, .8 ) ? 0 : 1;
-
-			settings.ShowCoxeter = RandBoolWeighted( rand, .7 );
 		}
 
 		private static Tiler.Settings GenSettings()
@@ -267,6 +261,10 @@ namespace TilingBot
 			Tiler.Settings settings = new Tiler.Settings();
 			RandomizeInputs( settings );
 			Test.InputsTesting( ref settings );
+			if( !Test.IsTesting )
+			{
+				string nextInQueue = Persistence.NextInQueue();
+			}
 
 			// Standard inputs.
 			int size = Test.IsTesting ? 400 : 1200;
@@ -333,15 +331,68 @@ namespace TilingBot
 			s{p,q} = htr{p,qP = h{p,q}_111 (snub)
 			*/
 
+			string centeringString = CenteringString( settings );
 			string modelString = ModelString( settings );
 			string activeString = ActiveMirrorsString( settings );
-			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown in {3} model. {4}",
-				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ), modelString, activeString );
+			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown{3} in {4} model. {5}",
+				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ), 
+				centeringString, modelString, activeString );
 		}
 
 		private static string InfinitySafe( int i )
 		{
 			return i == -1 ? "∞" : i.ToString();
+		}
+
+		private static string CenteringString( Tiler.Settings settings )
+		{
+			// We may not be able to describe this well in all cases, so typically we just return nothing.
+
+			if( settings.Centering == Tiler.Centering.General )
+				return " uncentered";
+
+			string vertexCentered = " vertex-centered";
+			string edgeCentered = " edge-centered";
+			string tileCentered = " tile-centered";
+
+			if( settings.Centering == Tiler.Centering.Vertex )
+				return vertexCentered;
+
+			if( settings.Active.Length == 1 )
+			{
+				switch( settings.Active[0] )
+				{
+				case 0:
+					{
+						switch( settings.Centering )
+						{
+						case Tiler.Centering.Fundamental_Triangle_Vertex1:
+							return vertexCentered;
+						case Tiler.Centering.Fundamental_Triangle_Vertex2:
+							return edgeCentered;
+						case Tiler.Centering.Fundamental_Triangle_Vertex3:
+							return tileCentered;
+						}
+						break;
+					}
+				case 2:
+					{
+						switch( settings.Centering )
+						{
+						case Tiler.Centering.Fundamental_Triangle_Vertex1:
+							return tileCentered;
+						case Tiler.Centering.Fundamental_Triangle_Vertex2:
+							return edgeCentered;
+						case Tiler.Centering.Fundamental_Triangle_Vertex3:
+							return vertexCentered;
+						}
+						break;
+					}
+				}
+
+			}
+
+			return string.Empty;
 		}
 
 		private static string ModelString( Tiler.Settings settings )

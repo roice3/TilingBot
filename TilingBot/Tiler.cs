@@ -19,6 +19,15 @@
 		{
 		}
 
+		public enum Centering
+		{
+			General, // General position
+			Fundamental_Triangle_Vertex1,
+			Fundamental_Triangle_Vertex2,
+			Fundamental_Triangle_Vertex3,
+			Vertex,	// For a vertex-transitive tiling
+		}
+
 		[DataContract( Namespace = "" )]
 		public class Settings
 		{
@@ -28,6 +37,7 @@
 
 				EdgeWidth = 0.025;
 				VertexWidth = EdgeWidth;
+				Centering = Centering.General;
 				EuclideanModel = EuclideanModel.Isometric;
 				SphericalModel = SphericalModel.Sterographic;
 				HyperbolicModel = HyperbolicModel.Poincare;
@@ -48,6 +58,9 @@
 
 			[DataMember]
 			public double VertexWidth { get; set; }
+
+			[DataMember]
+			public Centering Centering { get; set; }
 
 			[DataMember]
 			public Mobius Mobius { get; set; }
@@ -111,6 +124,7 @@
 			{
 				CalcMirrors();
 				CalcEdges();
+				CalcCentering();
 			}
 
 			private void CalcMirrors()
@@ -192,6 +206,29 @@
 				UniformEdges = edges.ToArray();
 				foreach( EdgeInfo e in UniformEdges )
 					e.PreCalc( g );
+			}
+
+			private void CalcCentering()
+			{
+				Mobius m = new Mobius();
+				switch( Centering )
+				{
+				case Centering.General:
+					return;
+				case Centering.Fundamental_Triangle_Vertex1:
+					m.Isometry( Geometry, 0, Verts[0] );
+					break;
+				case Centering.Fundamental_Triangle_Vertex2:
+					m.Isometry( Geometry, Math.PI/P, Verts[1] );
+					break;
+				case Centering.Fundamental_Triangle_Vertex3:
+					m.Isometry( Geometry, 0, Verts[2] );
+					break;
+				case Centering.Vertex:
+					m.Isometry( Geometry, 0, StartingPoint );
+					break;
+				}
+				Mobius = m;
 			}
 
 			public Tuple<Vector3D, Vector3D> IterateToStartingPoint( Geometry g, CircleNE[] mirrors, Vector3D[] verts, int[] activeMirrors )
@@ -766,7 +803,7 @@
 				}
 			}
 
-			//System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
+			System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
 			return false;
 		}
 
