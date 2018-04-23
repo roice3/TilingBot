@@ -12,4 +12,4 @@ http://roice3.org/
 
 This currently uses the R3.Core library from my HyperbolicModels project. If you want to build, you'll need to sync and build that repo as well.
 
-It also uses TweetSharp as a NuGet package, so that should just work.
+It also uses LinqToTwitter as a NuGet package, so that should just work.

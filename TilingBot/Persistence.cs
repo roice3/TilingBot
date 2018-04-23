@@ -1,17 +1,10 @@
 ﻿namespace TilingBot
 {
-	using R3.Core;
 	using R3.Geometry;
-	using R3.Math;
-	using System;
-	using System.Collections.Generic;
 	using System.IO;
 	using System.Linq;
-	using System.Numerics;
 	using System.Runtime.Serialization;
 	using System.Xml;
-	using TweetSharp;
-	using Color = System.Drawing.Color;
 
 	public class Persistence
 	{
@@ -31,6 +24,17 @@
 			}
 		}
 
+		public static void Move( string fileSansExtension, string from, string to )
+		{
+			string[] files = new string[] { fileSansExtension + ".png", fileSansExtension + ".xml" };
+			foreach( string file in files )
+			{
+				File.Move(
+					Path.Combine( from, file ),
+					Path.Combine( to, file ) );
+			}
+		}
+
 		public static string QueueDir
 		{
 			get
@@ -40,13 +44,27 @@
 			}
 		}
 
+		public static string QueueFile
+		{
+			get
+			{
+				return Path.Combine( WorkingDir, "queue.txt" );
+			}
+		}
+
 		public static string NextInQueue()
 		{
-			DirectoryInfo di = new DirectoryInfo( QueueDir );
-			FileInfo fi = di.GetFiles().OrderBy( f => f.Name ).FirstOrDefault();
-			if( fi == null )
+			string[] queue = File.ReadAllLines( QueueFile );
+			if( queue.Length == 0 )
 				return string.Empty;
-			return fi.Name;
+
+			return queue[0];
+		}
+
+		public static void PopQueue()
+		{
+			string[] queue = File.ReadAllLines( QueueFile );
+			File.WriteAllLines( QueueFile, queue.Skip( 1 ) );
 		}
 
 		public static void SaveSettings( Tiler.Settings settings, string path )

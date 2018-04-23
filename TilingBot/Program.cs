@@ -12,21 +12,20 @@
 // - Refactor: publish R3.Core on Nuget: https://docs.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio
 //
 // More ideas for variability, roughly prioritized
-// - Cell, edge, or vertex centered.
 // - Edge thickness, or even showing edges or not. Similar with vertices. (maybe if verts are smaller than edges, they could be subtracted out?)
-// - Change displayed model. UHS for Euclidean.
 // - Bounds
-// - B&W
+// - B&W coloring option
 // - More than one uniform on a single tiling?
 // - Other decorations (e.g. set of random points inside fundamental domain)
 // - Include non-uniform choices (i.e. pick a random point in fundamental domain)
 //
 // Fun ideas
-// - Pixellated.
+// - Pixellated. Euclidean tiling on a pixelated hyperbolic grid?
 
 
 namespace TilingBot
 {
+	using LinqToTwitter;
 	using R3.Core;
 	using R3.Geometry;
 	using R3.Math;
@@ -35,10 +34,9 @@ namespace TilingBot
 	using System.IO;
 	using System.Linq;
 	using System.Numerics;
-	using System.Runtime.Serialization;
-	using System.Xml;
-	using TweetSharp;
+	using System.Threading.Tasks;
 	using Color = System.Drawing.Color;
+	using Geometry = R3.Geometry.Geometry;
 
 	class Program
 	{
@@ -67,33 +65,41 @@ namespace TilingBot
 		static void BotWork()
 		{
 			m_timestamp = DateTime.Now;
+			Tiler.Settings settings;
 
-			// Generate the random settings.
-			Tiler.Settings settings = GenSettings();
-			String message = FormatTweet( settings );
-			Console.WriteLine( message );
-			Console.WriteLine( string.Empty );
-			// ZZZ - output the settings.
+			string existingImage = "";
+			string newPath = Path.Combine( Persistence.WorkingDir, existingImage + ".png" );
+			if( !string.IsNullOrEmpty( existingImage ) && !Test.IsTesting )
+			{
+				settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, existingImage + ".xml" ) );
+			}
+			else
+			{
+				// Generate the random settings.
+				settings = GenSettings();
 
-			// Make the tiling.
-			MakeTiling( settings );
+				// ZZZ - output the settings to the console.
 
-			// Archive it.
-			string imagePath = settings.FileName;
-			string newPath = Path.Combine( Persistence.WorkingDir, imagePath );
-			File.Move( imagePath, newPath );
+				// Make the tiling.
+				MakeTiling( settings );
 
-			// Save settings for posterity.
-			string settingsPath = FormatFileName() + ".xml";
-			settingsPath = Path.Combine( Persistence.WorkingDir, settingsPath );
-			Persistence.SaveSettings( settings, settingsPath );
+				// Archive it.
+				string imagePath = settings.FileName;
+				newPath = Path.Combine( Persistence.WorkingDir, imagePath );
+				File.Move( imagePath, newPath );
+
+				// Save settings for posterity.
+				string settingsPath = FormatFileName() + ".xml";
+				settingsPath = Path.Combine( Persistence.WorkingDir, settingsPath );
+				Persistence.SaveSettings( settings, settingsPath );
+			}
 
 			// Tweet it, but only if we aren't testing!
-			ReadTwitterKeys();
-			TwitterService service = new TwitterService( ConsumerKey, ConsumerKeySecret, AccessToken, AccessTokenSecret );
 			if( !Test.IsTesting )
 			{
-				SendTweet( service, message, newPath );
+				String message = FormatTweet( settings );
+				ReadTwitterKeys();
+				SendTweet( message, newPath ).Wait();
 
 				// Move to tweeted directory.
 			}
@@ -256,6 +262,14 @@ namespace TilingBot
 			settings.ColoringOption = RandBoolWeighted( rand, .8 ) ? 0 : 1;
 		}
 
+		private static void StandardInputs( Tiler.Settings settings )
+		{
+			int size = Test.IsTesting ? 400 : 1200;
+			settings.Antialias = true;
+			settings.Width = size;
+			settings.Height = size;
+		}
+
 		private static Tiler.Settings GenSettings()
 		{
 			Tiler.Settings settings = new Tiler.Settings();
@@ -263,14 +277,18 @@ namespace TilingBot
 			Test.InputsTesting( ref settings );
 			if( !Test.IsTesting )
 			{
-				string nextInQueue = Persistence.NextInQueue();
+				string next = Persistence.NextInQueue();
+				string queueDir = Persistence.QueueDir;
+				string fullPath = Path.Combine( queueDir, next + ".xml" );
+				if( File.Exists( fullPath ) )
+				{
+					settings = Persistence.LoadSettings( fullPath );
+					Persistence.Move( next, queueDir, Path.Combine( queueDir, "done" ) );
+				}
+				Persistence.PopQueue();
 			}
 
-			// Standard inputs.
-			int size = Test.IsTesting ? 400 : 1200;
-			settings.Antialias = true;
-			settings.Width = size;
-			settings.Height = size;
+			StandardInputs( settings );
 			settings.FileName = FormatFileName() + ".png";
 
 			double diskBounds = 1.01;
@@ -283,7 +301,7 @@ namespace TilingBot
 				settings.Bounds = settings.EuclideanModel == EuclideanModel.Isometric ? 2 : diskBounds;
 				break;
 			case Geometry.Hyperbolic:
-				settings.Bounds = settings.HyperbolicModel == HyperbolicModel.Orthographic ? 4 : diskBounds;
+				settings.Bounds = settings.HyperbolicModel == HyperbolicModel.Orthographic ? 5 : diskBounds;
 				if( settings.HyperbolicModel == HyperbolicModel.Band )
 				{
 					double factor = 1.5;
@@ -346,7 +364,17 @@ namespace TilingBot
 
 		private static string CenteringString( Tiler.Settings settings )
 		{
+			//
 			// We may not be able to describe this well in all cases, so typically we just return nothing.
+			//
+
+			if( settings.Geometry == Geometry.Spherical &&
+				settings.EuclideanModel == EuclideanModel.UpperHalfPlane )
+				return string.Empty;
+
+			if( settings.Geometry == Geometry.Hyperbolic &&
+				settings.HyperbolicModel == HyperbolicModel.UpperHalfPlane )
+				return string.Empty;
 
 			if( settings.Centering == Tiler.Centering.General )
 				return " uncentered";
@@ -389,7 +417,6 @@ namespace TilingBot
 						break;
 					}
 				}
-
 			}
 
 			return string.Empty;
@@ -543,24 +570,25 @@ namespace TilingBot
 			return uniformDesc;
 		}
 
-		// Thanks to tutorial here: https://www.youtube.com/watch?v=n2FadWBTL9E
-		private static void SendTweet( TwitterService service, string message, string imagePath )
+		// https://github.com/JoeMayo/LinqToTwitter/wiki/Tweeting-with-Media
+		private static async Task SendTweet( string status, string imagePath )
 		{
-			using( FileStream stream = new FileStream( imagePath, FileMode.Open ) )
+			var auth = new SingleUserAuthorizer
 			{
-				// I wasted a bunch of time trying to get the call with a callback to the response working.
-				// There may be a bug in TweetSharp, because a low-level method didn't like that some of the 
-				// SendTweetWithMediaOptions member variables were null, even though they are clearly nullable by design.
-				// Compound this with the TweetSharp repo not being available (had to look through code on searchcode.com),
-				// and I really should switch this out with some other tweeting code in the future.
-				service.SendTweetWithMedia( new SendTweetWithMediaOptions()
+				CredentialStore = new SingleUserInMemoryCredentialStore
 				{
-					Status = message,
-					Images = new Dictionary<string, Stream> { { imagePath, stream } }
-				} );
-			}
+					ConsumerKey = ConsumerKey,
+					ConsumerSecret = ConsumerKeySecret,
+					AccessToken = AccessToken,
+					AccessTokenSecret = AccessTokenSecret
+				}
+			};
+			var twitterCtx = new TwitterContext( auth );
 
-			Console.WriteLine( "Tweet sent!" );
+			Media media = await twitterCtx.UploadMediaAsync( File.ReadAllBytes( imagePath ), "image/png", "tweet_image" );
+			Status tweet = await twitterCtx.TweetAsync( status, new ulong[] { media.MediaID } );
+			if( tweet != null )
+				Console.WriteLine( $"Tweet sent: {tweet.Text}" );
 		}
 	}
 }
