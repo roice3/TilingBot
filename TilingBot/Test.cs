@@ -19,8 +19,7 @@
 			if( !IsTesting )
 				return;
 
-			//settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-4-21_09-17-42.xml" ) );
-			settings.HyperbolicModel = HyperbolicModel.Orthographic;
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-4-24_00-54-10.xml" ) );
 
 			//FirstTweet( settings );
 			//SphericalModels( settings );

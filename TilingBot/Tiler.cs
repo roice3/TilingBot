@@ -54,6 +54,9 @@
 			public int[] Active { get; set; }
 
 			[DataMember]
+			public bool Dual { get; set; }
+
+			[DataMember]
 			public double EdgeWidth { get; set; }
 
 			[DataMember]
@@ -166,6 +169,21 @@
 				Verts = verts;
 			}
 
+			private int[] OtherVerts( int i )
+			{
+				switch( i )
+				{
+				case 0:
+					return new int[] { 1, 2 };
+				case 1:
+					return new int[] { 2, 0 };	// The weird order here is because the first vertex may be at infinity, which can cause issues.
+				case 2:
+					return new int[] { 1, 0 };
+				}
+
+				throw new System.ArgumentException();
+			}
+
 			private void CalcEdges()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
@@ -183,24 +201,42 @@
 				List<EdgeInfo> edges = new List<EdgeInfo>();
 				foreach( int[] active in activeSet )
 				{
-					var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
-					Vector3D startingPoint = starting.Item1;
-
-					// Cache it. This is not actually global at the level of settings, so we may need to adjust in the future.
-					StartingPoint = startingPoint;
-					Mobius m = new Mobius();
-					m.Isometry( g, 0, -StartingPoint );
-					StartingPointMobius = m;
-
-					List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
-					foreach( int a in active )
+					if( Dual )
 					{
-						Vector3D reflected = Mirrors[a].ReflectPoint( startingPoint );
-						startingEdges.Add( new H3.Cell.Edge( startingPoint, reflected, order: false ) );    // CAN'T ORDER HERE!
-					}
+						var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
 
-					Vector3D color = starting.Item2;
-					edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = MixColor( color ) } );
+						// The edges are just the mirrors in this case.
+						List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
+						foreach( int a in active )
+						{
+							int[] other = OtherVerts( a );
+							startingEdges.Add( new H3.Cell.Edge( Verts[other[0]], Verts[other[1]], order: false ) );
+						}
+
+						Color color = MixColor( starting.Item2 );
+						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = Inverse( color ) } );
+					}
+					else
+					{ 
+						var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
+						Vector3D startingPoint = starting.Item1;
+
+						// Cache it. This is not actually global at the level of settings, so we may need to adjust in the future.
+						StartingPoint = startingPoint;
+						Mobius m = new Mobius();
+						m.Isometry( g, 0, -StartingPoint );
+						StartingPointMobius = m;
+
+						List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
+						foreach( int a in active )
+						{
+							Vector3D reflected = Mirrors[a].ReflectPoint( startingPoint );
+							startingEdges.Add( new H3.Cell.Edge( startingPoint, reflected, order: false ) );    // CAN'T ORDER HERE!
+						}
+
+						Vector3D color = starting.Item2;
+						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = MixColor( color ) } );
+					}
 				}
 
 				UniformEdges = edges.ToArray();
@@ -691,6 +727,11 @@
 				(int)(color.X * red.R + color.Y * green.R + color.Z * blue.R),
 				(int)(color.X * red.G + color.Y * green.G + color.Z * blue.G),
 				(int)(color.X * red.B + color.Y * green.B + color.Z * blue.B) );
+		}
+
+		public static Color Inverse( Color c )
+		{
+			return Color.FromArgb( 255, 255 - c.R, 255 - c.G, 255 - c.B );
 		}
 
 		private bool DrawLimit( Settings settings )

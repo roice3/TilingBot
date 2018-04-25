@@ -68,6 +68,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Test.cs" />
     <Compile Include="Tiler.cs" />
+    <Compile Include="Tweet.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
