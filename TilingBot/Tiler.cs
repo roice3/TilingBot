@@ -106,7 +106,7 @@
 			{
 				get
 				{
-					return Bounds * 2 / (Width - 1);
+					return Bounds * 2 / Width;
 				}
 			}
 
@@ -114,7 +114,7 @@
 			{
 				get
 				{
-					return Bounds * 2 / (Height - 1);
+					return Bounds * 2 / Height;
 				}
 			}
 
@@ -581,18 +581,19 @@
 
 				for( int j = 0; j < height; j++ )
 				{
-					double x = -bounds + i * xoff;
-					double y = -bounds + j * yoff;
+					double x = -bounds + xoff / 2 + i * xoff;
+					double y = -bounds + yoff / 2 + j * yoff;
 
 					if( settings.Antialias )
 					{
+						const double perc = 0.99;
 						const int div = 3;
 						List<Color> colors = new List<Color>();
 						for( int k = 0; k <= div; k++ )
 						for( int l = 0; l <= div; l++ )
 						{
-							double xa = x /*- xoff/2*/ + k * xoff / div;
-							double ya = y /*- yoff/2*/ + l * yoff / div;
+							double xa = x - xoff * perc / 2 + k * xoff * perc / div;
+							double ya = y - yoff * perc / 2 + l * yoff * perc / div;
 							Vector3D v = new Vector3D( xa, ya );
 
 							Color color;
@@ -640,6 +641,18 @@
 						break;
 					case SphericalModel.Gnomonic:
 						v = SphericalModels.GnomonicToStereo( v );
+						break;
+					case SphericalModel.Azimuthal_Equidistant:
+						//v = SphericalModels.EquidistantToStereo( v );
+						break;
+					case SphericalModel.Azimuthal_EqualArea:
+						//v = SphericalModels.EqualAreaToStereo( v );
+						break;
+					case SphericalModel.Equirectangular:
+						v = SphericalModels.EquirectangularToStereo( v );
+						break;
+					case SphericalModel.Mercator:
+						v = SphericalModels.MercatorToStereo( v );
 						break;
 					}
 					break;

@@ -149,6 +149,18 @@
 					case SphericalModel.Gnomonic:
 						model = "gnomonic";
 						break;
+					case SphericalModel.Azimuthal_Equidistant:
+						model = "equidistant";
+						break;
+					case SphericalModel.Azimuthal_EqualArea:
+						model = "equal area";
+						break;
+					case SphericalModel.Equirectangular:
+						model = "equirectangular";
+						break;
+					case SphericalModel.Mercator:
+						model = "Mercator";
+						break;
 					}
 					break;
 				}

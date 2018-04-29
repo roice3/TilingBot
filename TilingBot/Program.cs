@@ -245,7 +245,7 @@ namespace TilingBot
 
 		private static void StandardInputs( Tiler.Settings settings )
 		{
-			int size = Test.IsTesting ? 400 : 1200;
+			int size = Test.IsTesting ? 300 : 1200;
 			settings.Antialias = true;
 			settings.Width = size;
 			settings.Height = size;
@@ -276,7 +276,20 @@ namespace TilingBot
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
-				settings.Bounds = settings.SphericalModel == SphericalModel.Sterographic ? 6 : 2;
+				if( settings.SphericalModel == SphericalModel.Sterographic )
+					settings.Bounds = 6;
+				else if( settings.SphericalModel == SphericalModel.Equirectangular )
+				{
+					settings.Bounds = 1;
+					settings.Height = (int)(settings.Height * 2.0 / 3);
+					settings.Width = (int)(settings.Width * 4.0 / 3);
+				}
+				else if( settings.SphericalModel == SphericalModel.Mercator )
+				{
+					settings.Bounds = 1;
+				}
+				else
+					settings.Bounds = 2;
 				break;
 			case Geometry.Euclidean:
 				settings.Bounds = settings.EuclideanModel == EuclideanModel.Isometric ? 2 : diskBounds;
