@@ -47,7 +47,7 @@
 
 			string centeringString = CenteringString( settings );
 			string modelString = ModelString( settings );
-			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown{3} in {4} model. {5}",
+			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown{3} in {4}. {5}",
 				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ),
 				centeringString, modelString, 
 				settings.Dual ? DualString( settings ) : ActiveMirrorsString( settings ) );
@@ -137,6 +137,7 @@
 		{
 			string model = string.Empty;
 			string prefix = "the ";
+			string postfix = " model";
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
@@ -157,9 +158,11 @@
 						break;
 					case SphericalModel.Equirectangular:
 						model = "equirectangular";
+						postfix = " projection";
 						break;
 					case SphericalModel.Mercator:
 						model = "Mercator";
+						postfix = " projection";
 						break;
 					}
 					break;
@@ -208,7 +211,7 @@
 				}
 			}
 
-			return prefix + model;
+			return prefix + model + postfix;
 		}
 
 		private static string ActiveMirrorsString( Tiler.Settings settings )
