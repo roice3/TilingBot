@@ -416,6 +416,25 @@
 				return new Tuple<Vector3D, Vector3D>( toConformal( kleinVerts, bary ), bary );
 			}
 
+			public double DistInGeometry( Vector3D v1, Vector3D v2 )
+			{
+				double dist = double.MaxValue;
+				switch( this.Geometry )
+				{
+				case Geometry.Spherical:
+					dist = Spherical2D.SDist( v1, v2 );
+					break;
+				case Geometry.Euclidean:
+					dist = v1.Dist( v2 );
+					break;
+				case Geometry.Hyperbolic:
+					dist = H3Models.Ball.HDist( v1, v2 );
+					break;
+				}
+
+				return dist;
+			}
+
 			/// <summary>
 			/// NOTE: Only searches active vertices.
 			/// </summary>
@@ -426,20 +445,7 @@
 				foreach( int idx in Active )
 				{
 					Vector3D testV = Verts[idx];
-					double dist = double.MaxValue;
-					switch( this.Geometry )
-					{
-					case Geometry.Spherical:
-						dist = Spherical2D.SDist( test, testV );
-						break;
-					case Geometry.Euclidean:
-						dist = test.Dist( testV );
-						break;
-					case Geometry.Hyperbolic:
-						dist = H3Models.Ball.HDist( test, testV );
-						break;
-					}
-
+					double dist = DistInGeometry( test, testV );
 					if( dist < min )
 					{
 						min = dist;
@@ -530,6 +536,7 @@
 				p = m.Apply( p );
 
 				// Dots near the starting point.
+				// ZZZ - Make this a non-euclidean distance comparison (and below)?
 				if( p.Abs() < settings.VertexWidth )
 					return true;
 
@@ -544,6 +551,48 @@
 				double d;
 				H3Models.Ball.DupinCyclideSphere( p, cutoff, settings.Geometry, out cen, out d );
 				return d > Math.Abs( cen.Y );
+			}
+
+			public double DistTo( Settings settings, Vector3D p )
+			{
+				double min = double.MaxValue;
+				for( int i = 0; i < Edges.Length; i++ )
+				{
+					double d = DistTo( settings, p, i );
+					min = Math.Min( d, min );
+				}
+
+				return min;
+			}
+
+			public double DistTo( Settings settings, Vector3D p, int edgeIdx )
+			{
+				H3.Cell.Edge e = Edges[edgeIdx];
+				Mobius m = Mobii[edgeIdx];
+				double a = Angles[edgeIdx];
+
+				p = m.Apply( p );
+
+				double dOrigin = settings.DistInGeometry( p, new Vector3D() );
+				dOrigin /= settings.VertexWidth;
+
+				// Same side as endpoint?
+				double dEdge;
+				Vector3D end = m.Apply( e.End );
+				if( p.AngleTo( end ) > Math.PI / 2 )
+					dEdge = double.PositiveInfinity;
+				else
+				{
+					p.RotateXY( -a );
+
+					Vector3D p2 = p;
+					p2.Y = 0;	// Not correct thing to do.
+
+					dEdge = settings.DistInGeometry( p, p2 );
+					dEdge /= settings.EdgeWidth;
+				}
+
+				return Math.Min( dOrigin, dEdge );
 			}
 
 			public double AngleTo( Geometry g, Vector3D p, int edgeIdx )
@@ -614,7 +663,14 @@
 					{
 						lock( m_lock )
 						{
-							image.SetPixel( i, j, CalcColor( settings, new Vector3D( x, y ) ) );
+							Vector3D v = new Vector3D( x, y );
+							Color color;
+							if( !OutsideBoundary( settings, v, out color ) )
+							{
+								v = ApplyTransformation( v );
+								color = CalcColor( settings, v );
+							}
+							image.SetPixel( i, j, color );
 						}
 					}
 				}
@@ -662,7 +718,7 @@
 					switch( m_settings.EuclideanModel )
 					{
 					case EuclideanModel.Isometric:
-						return v;
+						break;
 					case EuclideanModel.Disk:
 						v = EuclideanModels.DiskToIsometric( v );
 						break;
@@ -818,6 +874,8 @@
 				return ColorFunc0( settings, v, flips, allFlips );
 			case 1:
 				return ColorFunc1( settings, v, flips, allFlips );
+			case 2:
+				return ColorFunc2( settings, v, flips, allFlips );
 			}
 
 			throw new System.ArgumentException( "Unknown Coloring Option." );
@@ -947,6 +1005,32 @@
 				return whitish;
 
 			return reflections % 2 == 0 ? whitish : ColorTranslator.FromHtml( "#BCBABE" );
+		}
+
+		private static Color ColorFunc2( Settings settings, Vector3D v, int[] flips, List<int> allFlips )
+		{
+			int reflections = flips.Sum();
+
+			double dist = double.MaxValue;
+			foreach( var edgeInfo in settings.UniformEdges )
+			{
+				double d = edgeInfo.DistTo( settings, v );
+				dist = Math.Min( d, dist );
+			}
+
+			Color c = settings.Colors[0];
+			double lowL = c.GetBrightness();
+
+			if( settings.ShowCoxeter && reflections % 2 != 0 )
+			{
+				lowL *= 1.2;
+				if( lowL > 1 )
+					lowL = 1;
+			}
+
+			double l = Math.Exp( -.2 * dist * dist );
+			l = lowL + l * (1.0 - lowL);
+			return ColorUtil.AdjustL( c, l );
 		}
 	}
 }
