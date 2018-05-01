@@ -43,9 +43,13 @@ namespace TilingBot
 		{
 			try
 			{
+				bool tweet = false;
+				if( args.Length == 1 && args[0] == "-Tweet" )
+					tweet = true;
+
 				int batch = 1;
 				for( int i = 0; i < batch; i++ )
-					BotWork();
+					BotWork( tweet );
 			}
 			catch( Exception e )
 			{
@@ -53,7 +57,7 @@ namespace TilingBot
 			}
 		}
 
-		static void BotWork()
+		static void BotWork( bool tweet )
 		{
 			m_timestamp = DateTime.Now;
 			Tiler.Settings settings;
@@ -68,7 +72,7 @@ namespace TilingBot
 			else
 			{
 				// Generate the random settings.
-				settings = GenSettings();
+				settings = GenSettings( tweet );
 				Console.WriteLine( Tweet.Format( settings ) + "\n" );
 
 				// Make the tiling.
@@ -86,7 +90,7 @@ namespace TilingBot
 			}
 
 			// Tweet it, but only if we aren't testing!
-			if( !Test.IsTesting )
+			if( tweet && !Test.IsTesting )
 			{
 				String message = Tweet.Format( settings );
 				Tweet.ReadKeys();
@@ -136,8 +140,7 @@ namespace TilingBot
 			double sat = RandDouble( rand, .2, 1.0 );
 			double lum = RandDouble( rand, .2, 1.0 );
 			Vector3D rgb = ColorUtil.CHSL2RGB( new Vector3D( hue, sat, lum ) );
-			rgb *= 255;
-			return Color.FromArgb( 255, (int)rgb.X, (int)rgb.Y, (int)rgb.Z );
+			return ColorUtil.FromRGB( rgb );
 		}
 
 		internal static Mobius RandomMobius( Geometry g, Random rand )
@@ -245,18 +248,18 @@ namespace TilingBot
 
 		private static void StandardInputs( Tiler.Settings settings )
 		{
-			int size = Test.IsTesting ? 300 : 1200;
-			settings.Antialias = true;
+			int size = Test.IsTesting ? 900 : 1200;
+			settings.Antialias = Test.IsTesting ? false : true;
 			settings.Width = size;
 			settings.Height = size;
 		}
 
-		private static Tiler.Settings GenSettings()
+		private static Tiler.Settings GenSettings( bool tweeting )
 		{
 			Tiler.Settings settings = new Tiler.Settings();
 			RandomizeInputs( settings );
 			Test.InputsTesting( ref settings );
-			if( !Test.IsTesting )
+			if( tweeting && !Test.IsTesting )
 			{
 				string next = Persistence.NextInQueue();
 				string queueDir = Persistence.QueueDir;
