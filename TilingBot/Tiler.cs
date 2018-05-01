@@ -214,7 +214,7 @@
 						}
 
 						Color color = MixColor( starting.Item2 );
-						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = Inverse( color ) } );
+						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = ColorUtil.Inverse( color ) } );
 					}
 					else
 					{ 
@@ -656,7 +656,7 @@
 
 						lock( m_lock )
 						{
-							image.SetPixel( i, j, AvgColor( colors ) );
+							image.SetPixel( i, j, ColorUtil.AvgColor( colors ) );
 						}
 					}
 					else
@@ -767,24 +767,6 @@
 
 		private readonly object m_lock = new object();
 
-		private static Color AvgColor( List<Color> colors )
-		{
-			int a = (int)colors.Select( c => (double)c.A ).Average();
-			int r = (int)colors.Select( c => (double)c.R ).Average();
-			int g = (int)colors.Select( c => (double)c.G ).Average();
-			int b = (int)colors.Select( c => (double)c.B ).Average();
-			return Color.FromArgb( a, r, g, b );
-		}
-
-		private static Color AvgColorSquare( List<Color> colors )
-		{
-			int a = (int)Math.Sqrt( colors.Select( c => (double)c.A * c.A ).Average() );
-			int r = (int)Math.Sqrt( colors.Select( c => (double)c.R * c.R ).Average() );
-			int g = (int)Math.Sqrt( colors.Select( c => (double)c.G * c.G ).Average() );
-			int b = (int)Math.Sqrt( colors.Select( c => (double)c.B * c.B ).Average() );
-			return Color.FromArgb( a, r, g, b );
-		}
-
 		private static Color MixColor( Vector3D color )
 		{
 			Color red = ColorTranslator.FromHtml( "#CF3721" );
@@ -796,11 +778,6 @@
 				(int)(color.X * red.R + color.Y * green.R + color.Z * blue.R),
 				(int)(color.X * red.G + color.Y * green.G + color.Z * blue.G),
 				(int)(color.X * red.B + color.Y * green.B + color.Z * blue.B) );
-		}
-
-		public static Color Inverse( Color c )
-		{
-			return Color.FromArgb( 255, 255 - c.R, 255 - c.G, 255 - c.B );
 		}
 
 		private bool DrawLimit( Settings settings )
@@ -871,11 +848,13 @@
 			switch( settings.ColoringOption )
 			{
 			case 0:
-				return ColorFunc0( settings, v, flips, allFlips );
+				return ColorFunc0( settings, v, flips );
 			case 1:
-				return ColorFunc1( settings, v, flips, allFlips );
+				return ColorFunc1( settings, v, flips );
 			case 2:
-				return ColorFunc2( settings, v, flips, allFlips );
+				return ColorFunc2( settings, v, flips );
+			case 3:
+				return ColorFunc1( settings, v, flips, hexagonColoring: true );
 			}
 
 			throw new System.ArgumentException( "Unknown Coloring Option." );
@@ -960,7 +939,7 @@
 			return false;
 		}
 
-		private static Color ColorFunc0( Settings settings, Vector3D v, int[] flips, List<int> allFlips )
+		private static Color ColorFunc0( Settings settings, Vector3D v, int[] flips )
 		{
 			int reflections = flips.Sum();
 
@@ -982,10 +961,10 @@
 			if( !within && reflections % 2 == 0 && settings.ShowCoxeter )
 				colors.Add( Color.White );
 
-			return AvgColorSquare( colors );
+			return ColorUtil.AvgColorSquare( colors );
 		}
 
-		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, List<int> allFlips )
+		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, bool hexagonColoring = false )
 		{
 			int reflections = flips.Sum();
 
@@ -997,17 +976,31 @@
 					colors.Add( edgeInfo.Color );
 				}
 			}
-			if( colors.Count > 0 )
-				return AvgColor( colors );
 
 			Color whitish = ColorTranslator.FromHtml( "#F1F1F2" );
+			Color darkish = ColorTranslator.FromHtml( "#BCBABE" );
+			if( hexagonColoring )
+			{
+				int incrementsUntilRepeat = 30;
+				int offset = 18;
+				int count = settings.ShowCoxeter ? reflections : flips[2];
+				whitish = ColorUtil.ColorAlongHexagon( incrementsUntilRepeat, count + offset );
+				Color edgeColor = ColorUtil.Inverse( whitish );
+				if( colors.Count > 0 )
+					return edgeColor;
+				return whitish;
+			}
+
+			if( colors.Count > 0 )
+				return ColorUtil.AvgColor( colors );
+
 			if( !settings.ShowCoxeter )
 				return whitish;
 
-			return reflections % 2 == 0 ? whitish : ColorTranslator.FromHtml( "#BCBABE" );
+			return reflections % 2 == 0 ? whitish : darkish;
 		}
 
-		private static Color ColorFunc2( Settings settings, Vector3D v, int[] flips, List<int> allFlips )
+		private static Color ColorFunc2( Settings settings, Vector3D v, int[] flips )
 		{
 			int reflections = flips.Sum();
 
