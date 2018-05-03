@@ -1,6 +1,7 @@
 ﻿namespace R3.Geometry
 {
 	using R3.Core;
+	using R3.Drawing;
 	using R3.Math;
 	using System;
 	using System.Collections.Generic;
@@ -42,6 +43,7 @@
 				SphericalModel = SphericalModel.Sterographic;
 				HyperbolicModel = HyperbolicModel.Poincare;
 				ColoringOption = 0;
+				GeodesicLevels = 0;
 			}
 
 			[DataMember]
@@ -55,6 +57,13 @@
 
 			[DataMember]
 			public bool Dual { get; set; }
+
+			/// <summary>
+			/// If > 1, can be used to denote the number of recusive divisions for a "geodesic sphere" or "geodesic saddle".
+			/// Only will apply if p=3.
+			/// </summary>
+			[DataMember]
+			public int GeodesicLevels { get; set; }
 
 			[DataMember]
 			public double EdgeWidth { get; set; }
@@ -184,18 +193,25 @@
 				throw new System.ArgumentException();
 			}
 
+			public bool IsGeodesicDomeAnalogue
+			{
+				get
+				{
+					return 
+						P == 3 && 
+						Geometry != Geometry.Euclidean &&	// Not supported yet.
+						GeodesicLevels > 0;
+				}
+			}
+
 			private void CalcEdges()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
 
-				List<int[]> activeSet = new List<int[]>();  // Do I really want to support multiple of these?
-				//activeSet.Add( new int[] { 0 } );
-				//activeSet.Add( new int[] { 1 } );
-				//activeSet.Add( new int[] { 2 } );
-				//activeSet.Add( new int[] { 0, 1 } );
-				//activeSet.Add( new int[] { 1, 2 } );
-				//activeSet.Add( new int[] { 0, 2 } );
-				//activeSet.Add( new int[] { 0, 1, 2 } );
+				if( IsGeodesicDomeAnalogue )
+					Active = new int[] { 0 };
+
+				List<int[]> activeSet = new List<int[]>();
 				activeSet.Add( Active );
 
 				List<EdgeInfo> edges = new List<EdgeInfo>();
@@ -236,12 +252,60 @@
 
 						Vector3D color = starting.Item2;
 						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = MixColor( color ) } );
+
+						if( IsGeodesicDomeAnalogue )
+						{
+							Vector3D p1 = Verts[0];
+							InfiniteQHack( ref p1 );
+							Vector3D p2 = p1; p2.RotateXY( 2 * Math.PI / 3 );
+							Vector3D p3 = p1; p3.RotateXY( 4 * Math.PI / 3 );
+							int divisions = (int)Math.Pow( 2, GeodesicLevels );
+							TextureHelper.SetLevels( GeodesicLevels );	// Ugh, clean up how the LOD is passed around. So bad.
+							Vector3D[] coords = TextureHelper.CalcViaProjections( p1, p2, p3, divisions, Geometry );
+							int[] elems = TextureHelper.TextureElements( 1, GeodesicLevels );
+							HashSet<H3.Cell.Edge> gEdges = new HashSet<H3.Cell.Edge>( new H3.Cell.EdgeEqualityComparer() );
+							for( int i = 0; i < elems.Length / 3; i++ )
+							{
+								int idx1 = i * 3;
+								int idx2 = i * 3 + 1;
+								int idx3 = i * 3 + 2;
+								Vector3D v1 = coords[elems[idx1]];
+								Vector3D v2 = coords[elems[idx2]];
+								Vector3D v3 = coords[elems[idx3]];
+
+								// Due to symmetry, keep only edges incident with the first sextant.
+								System.Func<Vector3D, bool> inSextant = v =>
+								 {
+									 double angle = Euclidean2D.AngleToCounterClock( new Vector3D( 1, 0 ), v );
+									 return Tolerance.GreaterThanOrEqual( angle, 0 ) && Tolerance.LessThanOrEqual( angle, Math.PI / 3 );
+								 };
+
+								if( inSextant( v1 ) )
+								{
+									gEdges.Add( new H3.Cell.Edge( v1, v2 ) );
+									gEdges.Add( new H3.Cell.Edge( v1, v3 ) );
+								}
+								if( inSextant( v2 ) || inSextant( v3 ) )
+									gEdges.Add( new H3.Cell.Edge( v2, v3 ) );
+							}
+
+							edges.Add( new EdgeInfo() { Edges = gEdges.ToArray(), Color = MixColor( color ), WidthFactor = 0.25 } );
+						}
 					}
 				}
 
 				UniformEdges = edges.ToArray();
 				foreach( EdgeInfo e in UniformEdges )
-					e.PreCalc( g );
+					e.PreCalc( this );
+			}
+
+			public void InfiniteQHack( ref Vector3D v )
+			{
+				if( Q != -1 )
+					return;
+
+				if( Active.Length == 1 && Active[0] == 0 )
+					v *= 0.999;
 			}
 
 			private void CalcCentering()
@@ -488,6 +552,7 @@
 		{
 			public H3.Cell.Edge[] Edges;
 			public Color Color;
+			public double WidthFactor = 1.0;
 
 			// Mobius transforms that will take the first edge point to the origin.
 			// This is to ease the calculation of distances to an edge.
@@ -495,15 +560,18 @@
 			public Mobius[] Mobii;
 			public double[] Angles;
 
-			public void PreCalc( Geometry g )
+			public void PreCalc( Settings settings )
 			{
+				Geometry g = settings.Geometry;
 				List<Mobius> mobii = new List<Mobius>();
 				List<double> angles = new List<double>();
 				for( int i = 0; i < Edges.Length; i++ )
 				{
 					var edge = Edges[i];
 					Mobius m = new Mobius();
-					m.Isometry( g, 0, -edge.Start );
+					Vector3D start = edge.Start;
+					settings.InfiniteQHack( ref start );
+					m.Isometry( g, 0, -start );
 					mobii.Add( m );
 
 					Vector3D end = m.Apply( edge.End );
@@ -514,30 +582,30 @@
 				Angles = angles.ToArray();
 			}
 
-			public bool PointWithinDist( Settings settings, Vector3D p )
+			public bool PointWithinDist( Settings settings, Vector3D p, double widthFactor )
 			{
 				for( int i = 0; i < Edges.Length; i++ )
 				{
-					if( PointWithinDist( settings, p, i ) )
+					if( PointWithinDist( settings, p, i, widthFactor ) )
 						return true;
 				}
 
 				return false;
 			}
 
-			public bool PointWithinDist( Settings settings, Vector3D p, int edgeIdx )
+			public bool PointWithinDist( Settings settings, Vector3D p, int edgeIdx, double widthFactor )
 			{
 				H3.Cell.Edge e = Edges[edgeIdx];
 				Mobius m = Mobii[edgeIdx];
 				double a = Angles[edgeIdx];
 
-				double cutoff = settings.EdgeWidth;
+				// Awkward that I made the width values the euclidean value at the origin :( Worth changing?
+				double cutoff = settings.EdgeWidth * widthFactor;
 
 				p = m.Apply( p );
 
 				// Dots near the starting point.
-				// ZZZ - Make this a non-euclidean distance comparison (and below)?
-				if( p.Abs() < settings.VertexWidth )
+				if( p.Abs() < settings.VertexWidth * widthFactor )
 					return true;
 
 				// Same side as endpoint?
@@ -574,7 +642,6 @@
 				p = m.Apply( p );
 
 				double dOrigin = settings.DistInGeometry( p, new Vector3D() );
-				dOrigin /= settings.VertexWidth;
 
 				// Same side as endpoint?
 				double dEdge;
@@ -584,14 +651,15 @@
 				else
 				{
 					p.RotateXY( -a );
+					double distToP = dOrigin;
+					double angleToP = new Vector3D( 1, 0 ).AngleTo( p );
 
-					Vector3D p2 = p;
-					p2.Y = 0;	// Not correct thing to do.
-
-					dEdge = settings.DistInGeometry( p, p2 );
-					dEdge /= settings.EdgeWidth;
+					// Use hyperbolic law of sines.
+					dEdge = DonHatch.asinh( DonHatch.sinh( distToP ) * Math.Sin( angleToP ) / Math.Sin( Math.PI / 2 ) );
 				}
 
+				dOrigin /= settings.VertexWidth;
+				dEdge /= settings.EdgeWidth;
 				return Math.Min( dOrigin, dEdge );
 			}
 
@@ -947,16 +1015,18 @@
 			bool within = false;
 			foreach( var edgeInfo in settings.UniformEdges )
 			{
-				within = edgeInfo.PointWithinDist( settings, v );
-				if( within )
+				bool tWithin = edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor );
+				if( tWithin )
 				{
 					for( int i = 0; i < 2; i++ )
 						colors.Add( ColorTranslator.FromHtml( "#2a3132" ) );
+					within = true;
+					break;
 				}
-
-				int idx = settings.ColorIndexForPoint( v );
-				colors.Add( settings.Colors[idx] );
 			}
+
+			int idx = settings.ColorIndexForPoint( v );
+			colors.Add( settings.Colors[idx] );
 
 			if( !within && reflections % 2 == 0 && settings.ShowCoxeter )
 				colors.Add( Color.White );
@@ -971,7 +1041,7 @@
 			List<Color> colors = new List<Color>();
 			foreach( var edgeInfo in settings.UniformEdges )
 			{
-				if( edgeInfo.PointWithinDist( settings, v ) )
+				if( edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor ) )
 				{
 					colors.Add( edgeInfo.Color );
 				}
@@ -1013,10 +1083,11 @@
 
 			Color c = settings.Colors[0];
 			double lowL = c.GetBrightness();
+			lowL = 0;
 
 			if( settings.ShowCoxeter && reflections % 2 != 0 )
 			{
-				lowL *= 1.2;
+				lowL += 0.5;
 				if( lowL > 1 )
 					lowL = 1;
 			}

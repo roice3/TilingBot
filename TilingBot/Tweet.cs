@@ -47,10 +47,23 @@
 
 			string centeringString = CenteringString( settings );
 			string modelString = ModelString( settings );
+			string additionalInfo = string.Empty;
+			if( settings.IsGeodesicDomeAnalogue )
+			{
+				additionalInfo = GeodesicString( settings );
+			}
+			else if( settings.Dual )
+			{
+				additionalInfo = DualString( settings );
+			}
+			else
+			{
+				additionalInfo = ActiveMirrorsString( settings );
+			}
+			
 			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown{3} in {4}. {5}",
 				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ),
-				centeringString, modelString, 
-				settings.Dual ? DualString( settings ) : ActiveMirrorsString( settings ) );
+				centeringString, modelString, additionalInfo );
 		}
 
 		private static string ShortDesc( Tiler.Settings settings )
@@ -58,6 +71,12 @@
 			string uniformDesc = UniformDesc( settings, false );
 			return string.Format( "{0} {{{1},{2}}}", uniformDesc,
 				InfinitySafe( settings.P ), InfinitySafe( settings.Q ) );
+		}
+
+		private static string GeodesicString( Tiler.Settings settings )
+		{
+			string desc = settings.Geometry == Geometry.Spherical ? "dome" : "saddle";
+			return "Geodesic " + desc + string.Format( " with {0} divisions per parent triangle.", Math.Pow( 2, settings.GeodesicLevels ) );
 		}
 
 		private static string DualString( Tiler.Settings settings )
