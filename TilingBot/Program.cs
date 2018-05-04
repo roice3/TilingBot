@@ -239,8 +239,13 @@ namespace TilingBot
 
 			settings.ShowCoxeter = RandBoolWeighted( rand, .7 );
 
+			RandomizeColors( settings, rand );
+		}
+
+		public static void RandomizeColors( Tiler.Settings settings, Random rand )
+		{
 			List<Color> colors = new List<Color>();
-			for( int i=0; i<3; i++ )
+			for( int i = 0; i < 3; i++ )
 				colors.Add( RandColor( rand ) );
 			settings.Colors = colors.ToArray();
 			settings.ColoringOption = RandBoolWeighted( rand, .8 ) ? 0 : 1;
@@ -248,8 +253,8 @@ namespace TilingBot
 
 		private static void StandardInputs( Tiler.Settings settings )
 		{
-			int size = Test.IsTesting ? 900 : 1200;
 			settings.Antialias = Test.IsTesting ? false : true;
+			int size = Test.IsTesting ? 900 : 1200;
 			settings.Width = size;
 			settings.Height = size;
 		}

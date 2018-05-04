@@ -76,7 +76,9 @@
 		private static string GeodesicString( Tiler.Settings settings )
 		{
 			string desc = settings.Geometry == Geometry.Spherical ? "dome" : "saddle";
-			return "Geodesic " + desc + string.Format( " with {0} divisions per parent triangle.", Math.Pow( 2, settings.GeodesicLevels ) );
+			return "Geodesic " + desc + string.Format( " with {0}-frequency subdivision. {1}", 
+				Math.Pow( 2, settings.GeodesicLevels ),
+				@"https://en.wikipedia.org/wiki/Geodesic_polyhedron" );
 		}
 
 		private static string DualString( Tiler.Settings settings )
