@@ -95,6 +95,12 @@
 			[DataMember]
 			public Color[] Colors { get; set; }
 
+			/// <summary>
+			/// Coloring functions can use this data however they please.
+			/// </summary>
+			[DataMember]
+			public int[] ColoringData { get; set; }
+
 			public int Width { get; set; }
 			public int Height { get; set; }
 			public double Bounds { get; set; }
@@ -1007,9 +1013,30 @@
 			return false;
 		}
 
+		private static int ColoringData( Settings settings, int idx )
+		{
+			if( settings.ColoringData == null ||
+				settings.ColoringData.Length < idx - 1 )
+				return 0;
+
+			return settings.ColoringData[idx];
+		}
+
 		private static Color ColorFunc0( Settings settings, Vector3D v, int[] flips )
 		{
 			int reflections = flips.Sum();
+
+			// By default we darken edges.
+			bool lightenEdges = ColoringData( settings, 0 ) == 1;
+			System.Action<List<Color>> darken = new System.Action<List<Color>>( c =>
+			{
+				for( int i = 0; i < 2; i++ )
+					c.Add( ColorTranslator.FromHtml( "#2a3132" ) );
+			} );
+			System.Action<List<Color>> lighten = new System.Action<List<Color>>( c =>
+			{
+				c.Add( Color.White );
+			} );
 
 			List<Color> colors = new List<Color>();
 			bool within = false;
@@ -1018,8 +1045,11 @@
 				bool tWithin = edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor );
 				if( tWithin )
 				{
-					for( int i = 0; i < 2; i++ )
-						colors.Add( ColorTranslator.FromHtml( "#2a3132" ) );
+					if( lightenEdges )
+						lighten( colors );
+					else
+						darken( colors );
+
 					within = true;
 					break;
 				}
@@ -1029,7 +1059,13 @@
 			colors.Add( settings.Colors[idx] );
 
 			if( !within && reflections % 2 == 0 && settings.ShowCoxeter )
-				colors.Add( Color.White );
+			{
+				// Do the opposite of what we did for edges.
+				if( lightenEdges )
+					darken( colors );
+				else
+					lighten( colors );
+			}
 
 			return ColorUtil.AvgColorSquare( colors );
 		}
