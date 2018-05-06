@@ -896,7 +896,7 @@
 
 				if( compare > 1.00133 )
 				{
-					color = Color.White;
+					color = Color.FromArgb( 0, 255, 255, 255 );
 					return true;
 				}
 
@@ -917,7 +917,7 @@
 			int[] flips = new int[3];
 			List<int> allFlips = new List<int>();
 			if( !ReflectToFundamental( settings, ref v, ref flips, allFlips ) )
-				return Color.White;
+				return Color.FromArgb( 255, 128, 128, 128 );
 
 			switch( settings.ColoringOption )
 			{
