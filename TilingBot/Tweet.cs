@@ -166,7 +166,9 @@
 					switch( settings.SphericalModel )
 					{
 					case SphericalModel.Sterographic:
-						model = "conformal (stereographic projection)";
+						prefix = string.Empty;
+						model = "stereographic";
+						postfix = " projection";
 						break;
 					case SphericalModel.Gnomonic:
 						model = "gnomonic";
