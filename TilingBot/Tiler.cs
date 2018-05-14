@@ -1117,20 +1117,24 @@
 				dist = Math.Min( d, dist );
 			}
 
-			Color c = settings.Colors[0];
-			double lowL = c.GetBrightness();
-			lowL = 0;
-
+			double low = 0;
 			if( settings.ShowCoxeter && reflections % 2 != 0 )
 			{
-				lowL += 0.5;
-				if( lowL > 1 )
-					lowL = 1;
+				low += 0.5;
+				if( low > 1 )
+					low = 1;
 			}
 
-			double l = Math.Exp( -.2 * dist * dist );
-			l = lowL + l * (1.0 - lowL);
-			return ColorUtil.AdjustL( c, l );
+			double newVal = Math.Exp( -.2 * dist * dist );
+			newVal = low + newVal * (1.0 - low);
+
+			// I tried adjusting saturation and hue as well, but didn't really like the results.
+			bool inverse = ColoringData( settings, 0 ) > 0;
+			if( inverse )
+				newVal = 1.0 - newVal;
+
+			Color c = settings.Colors[0];
+			return ColorUtil.AdjustL( c, newVal );
 		}
 	}
 }
