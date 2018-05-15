@@ -296,6 +296,12 @@ namespace TilingBot
 				{
 					settings.Bounds = 1;
 				}
+				else if( settings.SphericalModel == SphericalModel.Azimuthal_Equidistant ||
+					settings.SphericalModel == SphericalModel.Azimuthal_EqualArea ||
+					settings.SphericalModel == SphericalModel.Orthographic )
+				{
+					settings.Bounds = diskBounds;
+				}
 				else
 					settings.Bounds = 2;
 				break;

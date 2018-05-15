@@ -773,16 +773,19 @@
 						v = SphericalModels.GnomonicToStereo( v );
 						break;
 					case SphericalModel.Azimuthal_Equidistant:
-						//v = SphericalModels.EquidistantToStereo( v );
+						v = SphericalModels.EquidistantToStereo( v );
 						break;
 					case SphericalModel.Azimuthal_EqualArea:
-						//v = SphericalModels.EqualAreaToStereo( v );
+						v = SphericalModels.EqualAreaToStereo( v );
 						break;
 					case SphericalModel.Equirectangular:
 						v = SphericalModels.EquirectangularToStereo( v );
 						break;
 					case SphericalModel.Mercator:
 						v = SphericalModels.MercatorToStereo( v );
+						break;
+					case SphericalModel.Orthographic:
+						v = SphericalModels.OrthographicToStereo( v );
 						break;
 					}
 					break;
@@ -880,6 +883,7 @@
 
 		private bool OutsideBoundary( Settings settings, Vector3D v, out Color color )
 		{
+			Color bgColor = Color.FromArgb( 0, 255, 255, 255 );
 			if( DrawLimit( settings ) )
 			{
 				double compare = v.Abs();
@@ -896,7 +900,7 @@
 
 				if( compare > 1.00133 )
 				{
-					color = Color.FromArgb( 0, 255, 255, 255 );
+					color = bgColor;
 					return true;
 				}
 
@@ -905,6 +909,20 @@
 				{
 					color = Color.Black;
 					return true;
+				}
+			}
+
+			if( settings.Geometry == Geometry.Spherical )
+			{
+				if( settings.SphericalModel == SphericalModel.Azimuthal_Equidistant ||
+					settings.SphericalModel == SphericalModel.Azimuthal_EqualArea || 
+					settings.SphericalModel == SphericalModel.Orthographic )
+				{
+					if( v.Abs() > 1 )
+					{
+						color = bgColor;
+						return true;
+					}
 				}
 			}
 

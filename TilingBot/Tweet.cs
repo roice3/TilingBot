@@ -174,10 +174,10 @@
 						model = "gnomonic";
 						break;
 					case SphericalModel.Azimuthal_Equidistant:
-						model = "equidistant";
+						model = "equidistant azimuthal";
 						break;
 					case SphericalModel.Azimuthal_EqualArea:
-						model = "equal area";
+						model = "equal area azimuthal";
 						break;
 					case SphericalModel.Equirectangular:
 						model = "equirectangular";
@@ -185,6 +185,10 @@
 						break;
 					case SphericalModel.Mercator:
 						model = "Mercator";
+						postfix = " projection";
+						break;
+					case SphericalModel.Orthographic:
+						model = "orthographic";
 						postfix = " projection";
 						break;
 					}
