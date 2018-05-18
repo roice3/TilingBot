@@ -166,16 +166,18 @@
 					switch( settings.SphericalModel )
 					{
 					case SphericalModel.Sterographic:
-						model = "conformal (stereographic projection)";
+						prefix = string.Empty;
+						model = "stereographic";
+						postfix = " projection";
 						break;
 					case SphericalModel.Gnomonic:
 						model = "gnomonic";
 						break;
 					case SphericalModel.Azimuthal_Equidistant:
-						model = "equidistant";
+						model = "equidistant azimuthal";
 						break;
 					case SphericalModel.Azimuthal_EqualArea:
-						model = "equal area";
+						model = "equal area azimuthal";
 						break;
 					case SphericalModel.Equirectangular:
 						model = "equirectangular";
@@ -183,6 +185,10 @@
 						break;
 					case SphericalModel.Mercator:
 						model = "Mercator";
+						postfix = " projection";
+						break;
+					case SphericalModel.Orthographic:
+						model = "orthographic";
 						postfix = " projection";
 						break;
 					}
@@ -194,6 +200,10 @@
 					{
 					case EuclideanModel.Isometric:
 						model = "plane";
+						break;
+					case EuclideanModel.Conformal:
+						prefix = "a ";
+						model = "conformal";
 						break;
 
 					// These next two aren't well known and I should come up with better names.

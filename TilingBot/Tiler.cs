@@ -774,16 +774,19 @@
 						v = SphericalModels.GnomonicToStereo( v );
 						break;
 					case SphericalModel.Azimuthal_Equidistant:
-						//v = SphericalModels.EquidistantToStereo( v );
+						v = SphericalModels.EquidistantToStereo( v );
 						break;
 					case SphericalModel.Azimuthal_EqualArea:
-						//v = SphericalModels.EqualAreaToStereo( v );
+						v = SphericalModels.EqualAreaToStereo( v );
 						break;
 					case SphericalModel.Equirectangular:
 						v = SphericalModels.EquirectangularToStereo( v );
 						break;
 					case SphericalModel.Mercator:
 						v = SphericalModels.MercatorToStereo( v );
+						break;
+					case SphericalModel.Orthographic:
+						v = SphericalModels.OrthographicToStereo( v );
 						break;
 					}
 					break;
@@ -793,6 +796,7 @@
 					switch( m_settings.EuclideanModel )
 					{
 					case EuclideanModel.Isometric:
+					case EuclideanModel.Conformal:
 						break;
 					case EuclideanModel.Disk:
 						v = EuclideanModels.DiskToIsometric( v );
@@ -859,7 +863,8 @@
 		{
 			if( settings.Geometry == Geometry.Euclidean )
 			{
-				if( settings.EuclideanModel == EuclideanModel.Isometric )
+				if( settings.EuclideanModel == EuclideanModel.Isometric ||
+					settings.EuclideanModel == EuclideanModel.Conformal )
 					return false;
 				else
 					return true;
@@ -881,6 +886,7 @@
 
 		private bool OutsideBoundary( Settings settings, Vector3D v, out Color color )
 		{
+			Color bgColor = Color.FromArgb( 0, 255, 255, 255 );
 			if( DrawLimit( settings ) )
 			{
 				double compare = v.Abs();
@@ -897,7 +903,7 @@
 
 				if( compare > 1.00133 )
 				{
-					color = Color.FromArgb( 0, 255, 255, 255 );
+					color = bgColor;
 					return true;
 				}
 
@@ -906,6 +912,20 @@
 				{
 					color = Color.Black;
 					return true;
+				}
+			}
+
+			if( settings.Geometry == Geometry.Spherical )
+			{
+				if( settings.SphericalModel == SphericalModel.Azimuthal_Equidistant ||
+					settings.SphericalModel == SphericalModel.Azimuthal_EqualArea || 
+					settings.SphericalModel == SphericalModel.Orthographic )
+				{
+					if( v.Abs() > 1 )
+					{
+						color = bgColor;
+						return true;
+					}
 				}
 			}
 
@@ -1126,20 +1146,24 @@
 				dist = Math.Min( d, dist );
 			}
 
-			Color c = settings.Colors[0];
-			double lowL = c.GetBrightness();
-			lowL = 0;
-
+			double low = 0;
 			if( settings.ShowCoxeter && reflections % 2 != 0 )
 			{
-				lowL += 0.5;
-				if( lowL > 1 )
-					lowL = 1;
+				low += 0.5;
+				if( low > 1 )
+					low = 1;
 			}
 
-			double l = Math.Exp( -.2 * dist * dist );
-			l = lowL + l * (1.0 - lowL);
-			return ColorUtil.AdjustL( c, l );
+			double newVal = Math.Exp( -.2 * dist * dist );
+			newVal = low + newVal * (1.0 - low);
+
+			// I tried adjusting saturation and hue as well, but didn't really like the results.
+			bool inverse = ColoringData( settings, 0 ) > 0;
+			if( inverse )
+				newVal = 1.0 - newVal;
+
+			Color c = settings.Colors[0];
+			return ColorUtil.AdjustL( c, newVal );
 		}
 
 		private Color ColorFunc4( Settings settings, Vector3D v, int[] flips, int[] allFlips )
