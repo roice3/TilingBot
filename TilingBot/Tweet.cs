@@ -201,6 +201,10 @@
 					case EuclideanModel.Isometric:
 						model = "plane";
 						break;
+					case EuclideanModel.Conformal:
+						prefix = "a ";
+						model = "conformal";
+						break;
 
 					// These next two aren't well known and I should come up with better names.
 					case EuclideanModel.Disk:

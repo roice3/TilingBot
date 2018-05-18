@@ -795,6 +795,7 @@
 					switch( m_settings.EuclideanModel )
 					{
 					case EuclideanModel.Isometric:
+					case EuclideanModel.Conformal:
 						break;
 					case EuclideanModel.Disk:
 						v = EuclideanModels.DiskToIsometric( v );
@@ -861,7 +862,8 @@
 		{
 			if( settings.Geometry == Geometry.Euclidean )
 			{
-				if( settings.EuclideanModel == EuclideanModel.Isometric )
+				if( settings.EuclideanModel == EuclideanModel.Isometric ||
+					settings.EuclideanModel == EuclideanModel.Conformal )
 					return false;
 				else
 					return true;
