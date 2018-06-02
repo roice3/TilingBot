@@ -55,10 +55,21 @@
 		public static string NextInQueue()
 		{
 			string[] queue = File.ReadAllLines( QueueFile );
-			if( queue.Length == 0 )
+			if( queue.Length > 0 )
+				return queue[0];
+
+			return RandomQueueFile();
+		}
+
+		public static string RandomQueueFile()
+		{
+			string[] files = System.IO.Directory.GetFiles( QueueDir, "*.xml", SearchOption.TopDirectoryOnly );
+			if( files.Length == 0 )
 				return string.Empty;
 
-			return queue[0];
+			System.Random rand = new System.Random();
+			int idx = rand.Next( 0, files.Length );
+			return Path.GetFileNameWithoutExtension( files[idx] );
 		}
 
 		public static void PopQueue()
