@@ -4,7 +4,11 @@
 // - Iterating to starting point doesn't always converge, which could cause missed tweets.
 //
 // Things to work on
+// - Add in well-known descriptions for platonic solids, etc.
+// - Too many 3s in random selection
+// - SVG output
 // - Allow applying a circle inversion.
+// - Circles that are in-circles of the F.D.
 // - Better colors. Why do reds seem to rarely get picked? More color functions. Same saturation/intensity for all color choices?
 // - Animations
 // - Leverage the list of reflections to color cosets (e.g. like in MagicTile).
@@ -22,7 +26,8 @@
 // - Include non-uniform choices (i.e. pick a random point or line in fundamental domain)
 //
 // Fun ideas
-// - Pixellated. Euclidean tiling on a pixelated hyperbolic grid?
+// - Pixellated. 
+// - Euclidean tiling on a pixelated hyperbolic grid?
 
 
 namespace TilingBot
@@ -33,6 +38,7 @@ namespace TilingBot
 	using System;
 	using System.Collections.Generic;
 	using System.IO;
+	using System.Linq;
 	using System.Numerics;
 	using Color = System.Drawing.Color;
 	using Geometry = R3.Geometry.Geometry;
@@ -117,9 +123,21 @@ namespace TilingBot
 			return rand.NextDouble() <= fractionTrue;
 		}
 
-		private static int RandIntWeighted( Random rand )
+		/// <summary>
+		/// 0-indexed
+		/// </summary>
+		private static int RandIntWeighted( Random rand, int[] weights )
 		{
-			throw new System.NotImplementedException();
+			int weightsSum = weights.Sum();
+			int rnd = rand.Next( weightsSum );
+			for( int i = 0; i < weights.Length; i++ )
+			{
+				if( rnd < weights[i] )
+					return i;
+				rnd -= weights[i];
+			}
+
+			throw new System.Exception( "bug" );
 		}
 
 		private static int RandPQ( Random rand )
@@ -200,9 +218,9 @@ namespace TilingBot
 			settings.Active = active.ToArray();
 
 			settings.EdgeWidth = RandDouble( rand, 0, .05 );
-			settings.VertexWidth = RandDouble( rand, 0, .1 );
+			settings.VertexWidth = RandDouble( rand, 0, .075 );
 
-			int centering = rand.Next( 1, 6 );
+			int centering = 1 + RandIntWeighted( rand, new int[] { 40, 10, 10, 10, 10 } );
 			switch( centering )
 			{
 			case 1:
@@ -227,7 +245,7 @@ namespace TilingBot
 			{
 			case Geometry.Spherical:
 				{
-					int model = rand.Next( 1, 8 );
+					int model = 1 + RandIntWeighted( rand, new int[] { 30, 20, 5, 15, 5, 20, 15 } );
 					if( model == 2 )
 						settings.SphericalModel = SphericalModel.Gnomonic;
 					if( model == 3 )
@@ -244,7 +262,7 @@ namespace TilingBot
 				}
 			case Geometry.Euclidean:
 				{
-					int model = rand.Next( 1, 5 );
+					int model = 1 + RandIntWeighted( rand, new int[] { 30, 10, 10, 10 } );
 					if( model == 2 )
 						settings.EuclideanModel = EuclideanModel.Conformal;
 					if( model == 3 )
@@ -255,7 +273,7 @@ namespace TilingBot
 				}
 			case Geometry.Hyperbolic:
 				{
-					int model = rand.Next( 1, 6 );
+					int model = 1 + RandIntWeighted( rand, new int[] { 30, 20, 20, 20, 10 } );
 					if( model == 2 )
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
@@ -277,10 +295,12 @@ namespace TilingBot
 		public static void RandomizeColors( Tiler.Settings settings, Random rand )
 		{
 			List<Color> colors = new List<Color>();
-			for( int i = 0; i < 3; i++ )
+			for( int i = 0; i < 5; i++ )
 				colors.Add( RandColor( rand ) );
 			settings.Colors = colors.ToArray();
-			settings.ColoringOption = RandBoolWeighted( rand, .8 ) ? 0 : 1;
+			settings.ColoringOption = RandIntWeighted( rand, new int[] { 10, 20, 30, 10 } );
+			if( RandBool( rand ) )
+				settings.ColoringData = new int[] { 1 };
 		}
 
 		private static void StandardInputs( Tiler.Settings settings )

@@ -58,6 +58,9 @@
 			[DataMember]
 			public bool Dual { get; set; }
 
+			[DataMember]
+			public bool Snub { get; set; }
+
 			/// <summary>
 			/// If > 1, can be used to denote the number of recusive divisions for a "geodesic sphere" or "geodesic saddle".
 			/// Only will apply if p=3.
@@ -210,6 +213,22 @@
 				}
 			}
 
+			public bool IsOmnitruncated
+			{
+				get
+				{
+					return Active.Length == 3;
+				}
+			}
+
+			public bool IsSnub
+			{
+				get
+				{
+					return Snub && IsOmnitruncated && !IsGeodesicDomeAnalogue;
+				}
+			}
+
 			private void CalcEdges()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
@@ -300,9 +319,40 @@
 					}
 				}
 
+				if( IsSnub )
+				{
+					H3.Cell.Edge[] snubEdges = SnubEdges( this.StartingPoint, this.Mirrors );
+					EdgeInfo ei = new EdgeInfo() { Edges = snubEdges.ToArray(), Color = edges[0].Color };
+					edges.Clear();
+					edges.Add( ei );
+				}
+
 				UniformEdges = edges.ToArray();
 				foreach( EdgeInfo e in UniformEdges )
 					e.PreCalc( this );
+			}
+
+			private static H3.Cell.Edge[] SnubEdges( Vector3D startingPoint, CircleNE[] mirrors )
+			{
+				System.Func<int, int, Vector3D> end = ( i1, i2 ) =>
+				{
+					Vector3D e = mirrors[i1].ReflectPoint( startingPoint );
+					e = mirrors[i2].ReflectPoint( e );
+					return e;
+				};
+
+				HashSet<Vector3D> endingPoints = new HashSet<Vector3D>();
+				endingPoints.Add( end( 0, 1 ) );
+				endingPoints.Add( end( 0, 2 ) );
+				endingPoints.Add( end( 1, 0 ) );
+				endingPoints.Add( end( 1, 2 ) );
+				endingPoints.Add( end( 2, 1 ) );
+				endingPoints.Add( end( 2, 0 ) );
+
+				List<H3.Cell.Edge> snubEdges = new List<H3.Cell.Edge>();
+				foreach( Vector3D v in endingPoints )
+					snubEdges.Add( new H3.Cell.Edge( startingPoint, v, order: false ) );
+				return snubEdges.ToArray();
 			}
 
 			public void InfiniteQHack( ref Vector3D v )
@@ -346,16 +396,36 @@
 					return new Tuple<Vector3D, Vector3D>( verts[activeMirrors[0]], color );
 				}
 
+				List<int[]> edgeDefs = new List<int[]>();
+				if( IsSnub )
+				{
+					edgeDefs = new List<int[]>
+					{
+						new int[] { 0, 1 },
+						new int[] { 0, 2 },
+						new int[] { 1, 0 },
+						new int[] { 1, 2 },
+						new int[] { 2, 0 },
+						new int[] { 2, 1 },
+					};
+				}
+				else
+				{
+					foreach( int m in activeMirrors )
+						edgeDefs.Add( new int[] { m } );
+				}
+
 				// We are minimizing the output of this function, 
 				// because we want all edge lengths to be as close as possible.
 				// Input vector should be in the Ball Model.
 				Func<Vector3D, double> diffFunc = v =>
 				{
 					List<double> lengths = new List<double>();
-					for( int i = 0; i < activeMirrors.Length; i++ )
+					for( int i = 0; i < edgeDefs.Count; i++ )
 					{
-						int m = activeMirrors[i];
-						Vector3D reflected = mirrors[m].ReflectPoint( v );
+						Vector3D reflected = v;
+						foreach( int m in edgeDefs[i] )
+							reflected = mirrors[m].ReflectPoint( reflected );
 
 						double dist = 0;
 						switch( g )
@@ -437,7 +507,7 @@
 				// For each iteration, we'll shrink this search offset.
 				// NOTE: I'm not actually sure that the starting offset and decrease factor I'm using
 				// guarantee convergence, but it seems to be working pretty well (even when varying these parameters).
-				double factor = 1.5;
+				double factor = 1.3;
 				double searchOffset = bary[activeMirrors[0]] / factor;
 
 				double min = double.MaxValue;
@@ -479,6 +549,7 @@
 				if( !Tolerance.Equal( min, 0.0, 1e-14 ) )
 				{
 					System.Console.WriteLine( "Did not converge: " + min );
+					System.Console.WriteLine( string.Format( "{{{0},{1}}} {2}", P, Q, TilingBot.Tweet.ActiveMirrorsString( this ) ) );
 					System.Console.ReadKey( true );
 					//throw new System.Exception( "Boo. We did not converge." );
 				}
@@ -1046,8 +1117,7 @@
 		{
 			int reflections = flips.Sum();
 
-			// By default we darken edges.
-			bool lightenEdges = ColoringData( settings, 0 ) == 1;
+			bool lightenEdges = ColoringData( settings, 0 ) > 0;
 			System.Action<List<Color>> darken = new System.Action<List<Color>>( c =>
 			{
 				for( int i = 0; i < 2; i++ )
@@ -1058,24 +1128,41 @@
 				c.Add( Color.White );
 			} );
 
+			List<Vector3D> pointsToTry = new List<Vector3D>();
+			if( reflections % 2 == 0 && settings.IsSnub )
+			{
+				pointsToTry.Add( settings.Mirrors[0].ReflectPoint( v ) );
+				pointsToTry.Add( settings.Mirrors[1].ReflectPoint( v ) );
+				pointsToTry.Add( settings.Mirrors[2].ReflectPoint( v ) );
+			}
+			else
+				pointsToTry.Add( v );
+
 			List<Color> colors = new List<Color>();
 			bool within = false;
-			foreach( var edgeInfo in settings.UniformEdges )
-			{
-				bool tWithin = edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor );
-				if( tWithin )
+			foreach( Vector3D testV in pointsToTry )
+			{ 
+				foreach( var edgeInfo in settings.UniformEdges )
 				{
-					if( lightenEdges )
-						lighten( colors );
-					else
-						darken( colors );
+					bool tWithin = edgeInfo.PointWithinDist( settings, testV, edgeInfo.WidthFactor );
+					if( tWithin )
+					{
+						if( lightenEdges )
+							lighten( colors );
+						else
+							darken( colors );
 
-					within = true;
-					break;
+						within = true;
+						break;
+					}
 				}
+				if( within )
+					break;
 			}
 
 			int idx = settings.ColorIndexForPoint( v );
+			if( settings.IsSnub )
+				idx = 0;
 			colors.Add( settings.Colors[idx] );
 
 			if( !within && reflections % 2 == 0 && settings.ShowCoxeter )

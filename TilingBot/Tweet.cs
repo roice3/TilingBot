@@ -58,12 +58,17 @@
 			}
 			else
 			{
-				additionalInfo = ActiveMirrorsString( settings );
+				additionalInfo = Capitalize( ShortDesc( settings ) ) + ".";
 			}
 			
-			return string.Format( "{0} #tiling with [{1},{2}] #symmetry, shown{3} in {4}. {5}",
-				tilingType, InfinitySafe( settings.P ), InfinitySafe( settings.Q ),
-				centeringString, modelString, additionalInfo );
+			return string.Format( "{0} #tiling shown{1} in {2}. {3}",
+				tilingType, centeringString, modelString, additionalInfo );
+		}
+
+		private static string SymmetryDesc( Tiler.Settings settings )
+		{
+			return string.Format( "[{1},{2}] #symmetry",
+				InfinitySafe( settings.P ), InfinitySafe( settings.Q ) );
 		}
 
 		private static string ShortDesc( Tiler.Settings settings )
@@ -76,8 +81,9 @@
 		private static string GeodesicString( Tiler.Settings settings )
 		{
 			string desc = settings.Geometry == Geometry.Spherical ? "dome" : "saddle";
-			return "Geodesic " + desc + string.Format( " with {0}-frequency subdivision. {1}", 
-				Math.Pow( 2, settings.GeodesicLevels ),
+			string symmetry = SymmetryDesc( settings );
+			return "Geodesic " + desc + string.Format( " with {0} and {1}-frequency subdivision. {2}", 
+				symmetry, Math.Pow( 2, settings.GeodesicLevels ),
 				@"https://en.wikipedia.org/wiki/Geodesic_polyhedron" );
 		}
 
@@ -92,6 +98,14 @@
 		private static string InfinitySafe( int i )
 		{
 			return i == -1 ? "∞" : i.ToString();
+		}
+
+		private static string Capitalize( string input )
+		{
+			if( string.IsNullOrEmpty( input ) )
+				return input;
+
+			return input.First().ToString().ToUpper() + input.Substring( 1 );
 		}
 
 		private static string CenteringString( Tiler.Settings settings )
@@ -245,7 +259,7 @@
 			return prefix + model + postfix;
 		}
 
-		private static string ActiveMirrorsString( Tiler.Settings settings )
+		internal static string ActiveMirrorsString( Tiler.Settings settings )
 		{
 			List<string> mirrorDesc = new List<string>();
 			foreach( int a in settings.Active )
@@ -291,13 +305,17 @@
 
 			if( m.Length == 1 )
 			{
-				if( m[0] == 1 )
+				if( m[0] == 0 )
+				{
+					uniformDesc = "regular";
+				}
+				else if( m[0] == 1 )
 				{
 					uniformDesc = "rectified";
 				}
-				if( m[0] == 2 )
+				else if( m[0] == 2 )
 				{
-					uniformDesc = "dual tiling";
+					uniformDesc = "dual to";
 				}
 			}
 			else if( m.Length == 2 )
@@ -318,7 +336,7 @@
 			}
 			else if( m.Length == 3 )
 			{
-				uniformDesc = "omnitruncated";
+				uniformDesc = settings.IsSnub ? "snub" : "omnitruncated";
 			}
 
 			if( addParenthesis && !string.IsNullOrEmpty( uniformDesc ) )
