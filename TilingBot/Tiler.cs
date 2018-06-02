@@ -1138,7 +1138,7 @@
 			} );
 
 			List<Vector3D> pointsToTry = new List<Vector3D>();
-			if( reflections % 2 == 0 && settings.IsSnub )
+			if( reflections % 2 == 1 && settings.IsSnub )
 			{
 				pointsToTry.Add( settings.Mirrors[0].ReflectPoint( v ) );
 				pointsToTry.Add( settings.Mirrors[1].ReflectPoint( v ) );
