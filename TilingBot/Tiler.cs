@@ -1,7 +1,8 @@
-﻿namespace R3.Geometry
+﻿namespace TilingBot
 {
 	using R3.Core;
 	using R3.Drawing;
+	using R3.Geometry;
 	using R3.Math;
 	using System;
 	using System.Collections.Generic;
@@ -1020,6 +1021,8 @@
 				return ColorFunc2( settings, v, flips );
 			case 3:
 				return ColorFunc1( settings, v, flips, hexagonColoring: true );
+			case 4:
+				return ColorFunc4( settings, v, flips, allFlips.ToArray() );
 			}
 
 			throw new System.ArgumentException( "Unknown Coloring Option." );
@@ -1102,6 +1105,12 @@
 			}
 
 			return false;
+		}
+
+		private void ReflectSequence( CircleNE[] mirrors, int[] reflections, ref Vector3D v )
+		{
+			foreach( int reflection in reflections )
+				v = mirrors[reflection].ReflectPoint( v );
 		}
 
 		private static int ColoringData( Settings settings, int idx )
@@ -1243,5 +1252,63 @@
 			Color c = settings.Colors[0];
 			return ColorUtil.AdjustL( c, newVal );
 		}
+
+		private Color ColorFunc4( Settings settings, Vector3D v, int[] flips, int[] allFlips )
+		{
+			//int reflections = flips.Sum();
+
+			// Reflect back so that we take up the entire polygon {p}.
+			int[] sequence = allFlips.Reverse().Where( m => m != 2 ).ToArray();
+			//int[] sequence = allFlips.Reverse().Where( m => m != 1 ).ToArray();
+			//v = settings.Mobius.Inverse().Apply( v );
+			ReflectSequence( settings.Mirrors, sequence, ref v );
+			//v = settings.Mobius.Apply( v );
+
+			lock( m_lock )
+			{
+				if( m_texture == null )
+				{
+
+					string path = System.IO.Path.Combine( Persistence.WorkingDir, "Nelson-25-Edit.JPG" );
+					m_texture = new Bitmap( path );
+					m_texture.RotateFlip( RotateFlipType.RotateNoneFlipY );
+
+				}
+
+				double w = m_texture.Width;
+				double h = m_texture.Height;
+
+				// Scale v so that the image will cover the f.d.
+				double s = 1.0 / ((settings.Verts[0].Abs() + 1) / 2);
+				s *= 2.3;
+				v *= s;
+
+				// Get the pixel coords.
+				double size = w < h ? w : h;
+				double x = (v.X + 1) / 2 * size;
+				double y = (v.Y + 1) / 2 * size;
+				y += 175;
+				x += 15;
+				y -= 0;
+				//x -= 25;
+				if( x < 0 )
+					x = Math.Abs( x );
+				if( x >= w )
+					x = w - 1 - (x-w);
+				if( y < 0 )
+					y += h;
+				if( y >= h )
+					y -= h;
+
+				if( x < 0 || y < 0 ||
+					x >= w || y >= h )
+				//if( v.Abs() > 1.13 )
+					return Color.FromArgb( 255, 0, 0, 0 );
+
+				return m_texture.GetPixel( (int)x, (int)y );
+			}
+		}
+
+		private Bitmap m_texture;
 	}
 }
