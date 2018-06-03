@@ -48,9 +48,11 @@
 			string centeringString = CenteringString( settings );
 			string modelString = ModelString( settings );
 			string additionalInfo = string.Empty;
+			string link = string.Empty;
 			if( settings.IsGeodesicDomeAnalogue )
 			{
 				additionalInfo = GeodesicString( settings );
+				link = @"https://en.wikipedia.org/wiki/Geodesic_polyhedron";
 			}
 			else if( settings.Dual )
 			{
@@ -60,14 +62,19 @@
 			{
 				additionalInfo = Capitalize( ShortDesc( settings ) ) + ".";
 			}
-			
-			return string.Format( "{0} #tiling shown{1} in {2}. {3}",
-				tilingType, centeringString, modelString, additionalInfo );
+																		
+			if( settings.IsSnub )
+				link = @"https://en.wikipedia.org/wiki/Snub_(geometry)";
+			if( !string.IsNullOrEmpty( link ) )
+				link = " " + link;
+
+			return string.Format( "{0} #tiling shown{1} in {2}. {3}{4}",
+				tilingType, centeringString, modelString, additionalInfo, link );
 		}
 
 		private static string SymmetryDesc( Tiler.Settings settings )
 		{
-			return string.Format( "[{1},{2}] #symmetry",
+			return string.Format( "[{0},{1}] #symmetry",
 				InfinitySafe( settings.P ), InfinitySafe( settings.Q ) );
 		}
 
@@ -82,9 +89,8 @@
 		{
 			string desc = settings.Geometry == Geometry.Spherical ? "dome" : "saddle";
 			string symmetry = SymmetryDesc( settings );
-			return "Geodesic " + desc + string.Format( " with {0} and {1}-frequency subdivision. {2}", 
-				symmetry, Math.Pow( 2, settings.GeodesicLevels ),
-				@"https://en.wikipedia.org/wiki/Geodesic_polyhedron" );
+			return "Geodesic " + desc + string.Format( " with {0} and {1}-frequency subdivision.", 
+				symmetry, Math.Pow( 2, settings.GeodesicLevels ) );
 		}
 
 		private static string DualString( Tiler.Settings settings )
