@@ -1,0 +1,49 @@
+Known Issues
+- Vertex drawing on Catalan tilings.
+- Coloring on rectifieds.
+- Iterating to starting point doesn't always converge, which could cause missed tweets.
+- “vertex-centered” can we make orientation better?
+
+Work Debt
+- Publish R3.Core on Nuget: https://docs.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio
+
+Tiling ideas
+- Johnson solid analogue in hyperbolic plane?
+- prisms/antiprism
+- Circles that are in-circles of the F.D.
+- Animations
+- Leverage the list of reflections to color cosets (e.g. like in MagicTile).
+- Non-triangular domains (see FB thread with Tom).
+- Links to wiki pages (would require ensuring redirect links for wiki pages existed).
+- Include non-uniform choices (i.e. pick a random point or line in fundamental domain)
+- stellations
+- triaxial weave
+- https://mathblog.com/tiling-one-arc-sided-shape
+- circles emanating from F.D. verts., like MagicTile
+- support tilings I've emailed myself
+- support for "mosaic" tilings, i.e. subdivide F.D. into Vornoi cells.
+
+Feature Ideas
+- support custom tweet strings, and maybe specialized code for "requested by"
+- Add in well-known descriptions for platonic solids, etc.
+- SVG output
+- disk model with hyperbolas? (I experimented some with this).
+- pictures (cats on caturday?)
+- constant width lines
+
+Variability Ideas or Improvement
+- Allow applying a circle inversion.
+- Too many 3s in random selection
+- Bounds
+- B&W coloring option
+- More than one uniform on a single tiling? Or uniform + dual on same tiling.
+- Other decorations (e.g. set of random points inside fundamental domain)
+- Better colors. Why do reds seem to rarely get picked? More color functions. Same saturation/intensity for all color choices?
+
+Fun ideas
+- Pixellated. 
+- Euclidean tiling on a pixelated hyperbolic grid?
+
+Research Ideas:
+- non-repeating tiling with infinite number of tiles possible? Or maybe just tilings that transition between different tilings, say from {7,3} to 14-gons.
+- How do {5,3} and {7,3} interact on same image? (orthographic projections)

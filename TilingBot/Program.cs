@@ -1,36 +1,4 @@
-﻿// Known Issues
-// - Vertex drawing on Catalan tilings.
-// - Coloring on rectifieds.
-// - Iterating to starting point doesn't always converge, which could cause missed tweets.
-//
-// Things to work on
-// - Add in well-known descriptions for platonic solids, etc.
-// - Too many 3s in random selection
-// - SVG output
-// - Allow applying a circle inversion.
-// - Circles that are in-circles of the F.D.
-// - Better colors. Why do reds seem to rarely get picked? More color functions. Same saturation/intensity for all color choices?
-// - Animations
-// - Leverage the list of reflections to color cosets (e.g. like in MagicTile).
-// - Snubs
-// - Non-triangular domains (see FB thread with Tom).
-// - Links to wiki pages (would require ensuring redirect links for wiki pages existed).
-// - Refactor: publish R3.Core on Nuget: https://docs.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio
-//
-// More ideas for variability, roughly prioritized
-// - Edge thickness, or even showing edges or not. Similar with vertices. (maybe if verts are smaller than edges, they could be subtracted out?)
-// - Bounds
-// - B&W coloring option
-// - More than one uniform on a single tiling? Or uniform + dual on same tiling.
-// - Other decorations (e.g. set of random points inside fundamental domain)
-// - Include non-uniform choices (i.e. pick a random point or line in fundamental domain)
-//
-// Fun ideas
-// - Pixellated. 
-// - Euclidean tiling on a pixelated hyperbolic grid?
-
-
-namespace TilingBot
+﻿namespace TilingBot
 {
 	using R3.Core;
 	using R3.Geometry;
