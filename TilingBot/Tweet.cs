@@ -54,9 +54,14 @@
 				additionalInfo = GeodesicString( settings );
 				link = @"https://en.wikipedia.org/wiki/Geodesic_polyhedron";
 			}
-			else if( settings.Dual )
+			else if( settings.IsGoldberg )
 			{
-				additionalInfo = DualString( settings );
+				additionalInfo = GoldbergString( settings );
+				link = @"https://en.wikipedia.org/wiki/Goldberg_polyhedron";
+			}
+			else if( settings.IsCatalanDual )
+			{
+				additionalInfo = CatalanDualString( settings );
 			}
 			else
 			{
@@ -93,9 +98,16 @@
 				symmetry, Math.Pow( 2, settings.GeodesicLevels ) );
 		}
 
-		private static string DualString( Tiler.Settings settings )
+		private static string GoldbergString( Tiler.Settings settings )
 		{
-			if( !settings.Dual )
+			string desc = settings.Geometry == Geometry.Spherical ? "polyhedron" : "\"polyhedron\"";
+			return "Goldberg " + desc + string.Format( " with {0} and {1} steps.", 
+				SymmetryDesc( settings ), Math.Pow( 2, settings.GeodesicLevels ) );
+		}
+
+		private static string CatalanDualString( Tiler.Settings settings )
+		{
+			if( !settings.IsCatalanDual )
 				return string.Empty;
 
 			return "Catalan tiling dual to " + ShortDesc( settings ) + ".";
@@ -120,7 +132,7 @@
 			// We may not be able to describe this well in all cases, so typically we just return nothing.
 			//
 
-			if( settings.Geometry == Geometry.Spherical &&
+			if( settings.Geometry == Geometry.Euclidean &&
 				settings.EuclideanModel == EuclideanModel.UpperHalfPlane )
 				return string.Empty;
 

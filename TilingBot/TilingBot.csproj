@@ -69,6 +69,7 @@
     <Compile Include="Test.cs" />
     <Compile Include="Tiler.cs" />
     <Compile Include="Tweet.cs" />
+    <Compile Include="Util.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

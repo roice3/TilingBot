@@ -203,14 +203,46 @@
 				throw new System.ArgumentException();
 			}
 
+			public bool IsRegular
+			{
+				get
+				{
+					return Active.Length == 1 && Active[0] != 1;
+				}
+			}
+
+			public bool IsCatalanDual
+			{
+				get
+				{
+					return Dual && !IsRegular;
+				}
+			}
+
+			private bool IsGeodesicOrGoldberg
+			{
+				get
+				{
+					return
+						P == 3 &&
+						Geometry != Geometry.Euclidean &&   // Not supported yet.
+						GeodesicLevels > 0;
+				}
+			}
+
 			public bool IsGeodesicDomeAnalogue
 			{
 				get
 				{
-					return 
-						P == 3 && 
-						Geometry != Geometry.Euclidean &&	// Not supported yet.
-						GeodesicLevels > 0;
+					return IsGeodesicOrGoldberg && !Dual;
+				}
+			}
+
+			public bool IsGoldberg
+			{
+				get
+				{
+					return IsGeodesicOrGoldberg && Dual;
 				}
 			}
 
@@ -243,9 +275,11 @@
 				List<EdgeInfo> edges = new List<EdgeInfo>();
 				foreach( int[] active in activeSet )
 				{
-					if( Dual )
+					if( IsCatalanDual && !IsGoldberg )
 					{
 						var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
+						Color color = MixColor( starting.Item2 );
+						// Do we need to set the global variable here?
 
 						// The edges are just the mirrors in this case.
 						List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
@@ -255,15 +289,14 @@
 							startingEdges.Add( new H3.Cell.Edge( Verts[other[0]], Verts[other[1]], order: false ) );
 						}
 
-						Color color = MixColor( starting.Item2 );
 						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = ColorUtil.Inverse( color ) } );
 					}
 					else
-					{ 
+					{
 						var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
 						Vector3D startingPoint = starting.Item1;
 
-						// Cache it. This is not actually global at the level of settings, so we may need to adjust in the future.
+						// Cache it. This is not global at the level of settings, so we may need to adjust in the future.
 						StartingPoint = startingPoint;
 						Mobius m = new Mobius();
 						m.Isometry( g, 0, -StartingPoint );
@@ -279,44 +312,7 @@
 						Vector3D color = starting.Item2;
 						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = MixColor( color ) } );
 
-						if( IsGeodesicDomeAnalogue )
-						{
-							Vector3D p1 = Verts[0];
-							InfiniteQHack( ref p1 );
-							Vector3D p2 = p1; p2.RotateXY( 2 * Math.PI / 3 );
-							Vector3D p3 = p1; p3.RotateXY( 4 * Math.PI / 3 );
-							int divisions = (int)Math.Pow( 2, GeodesicLevels );
-							TextureHelper.SetLevels( GeodesicLevels );	// Ugh, clean up how the LOD is passed around. So bad.
-							Vector3D[] coords = TextureHelper.CalcViaProjections( p1, p2, p3, divisions, Geometry );
-							int[] elems = TextureHelper.TextureElements( 1, GeodesicLevels );
-							HashSet<H3.Cell.Edge> gEdges = new HashSet<H3.Cell.Edge>( new H3.Cell.EdgeEqualityComparer() );
-							for( int i = 0; i < elems.Length / 3; i++ )
-							{
-								int idx1 = i * 3;
-								int idx2 = i * 3 + 1;
-								int idx3 = i * 3 + 2;
-								Vector3D v1 = coords[elems[idx1]];
-								Vector3D v2 = coords[elems[idx2]];
-								Vector3D v3 = coords[elems[idx3]];
-
-								// Due to symmetry, keep only edges incident with the first sextant.
-								System.Func<Vector3D, bool> inSextant = v =>
-								 {
-									 double angle = Euclidean2D.AngleToCounterClock( new Vector3D( 1, 0 ), v );
-									 return Tolerance.GreaterThanOrEqual( angle, 0 ) && Tolerance.LessThanOrEqual( angle, Math.PI / 3 );
-								 };
-
-								if( inSextant( v1 ) )
-								{
-									gEdges.Add( new H3.Cell.Edge( v1, v2 ) );
-									gEdges.Add( new H3.Cell.Edge( v1, v3 ) );
-								}
-								if( inSextant( v2 ) || inSextant( v3 ) )
-									gEdges.Add( new H3.Cell.Edge( v2, v3 ) );
-							}
-
-							edges.Add( new EdgeInfo() { Edges = gEdges.ToArray(), Color = MixColor( color ), WidthFactor = 0.25 } );
-						}
+						HandleGeodesicOrGoldberg( edges, color );
 					}
 				}
 
@@ -331,6 +327,91 @@
 				UniformEdges = edges.ToArray();
 				foreach( EdgeInfo e in UniformEdges )
 					e.PreCalc( this );
+			}
+
+			private void HandleGeodesicOrGoldberg( List<EdgeInfo> edges, Vector3D color )
+			{
+				if( !IsGeodesicOrGoldberg )
+					return;
+
+				Geometry g = Geometry;
+
+				Vector3D p1 = Verts[0];
+				InfiniteQHack( ref p1 );
+				Vector3D p2 = p1;
+				p2.RotateXY( -2 * Math.PI / 3 );    // CW to make the vertices calculated by the texture helper nicer
+				Vector3D p3 = p1;
+				p3.RotateXY( -4 * Math.PI / 3 );
+				int divisions = (int)Math.Pow( 2, GeodesicLevels );
+				TextureHelper.SetLevels( GeodesicLevels );  // Ugh, clean up how the LOD is passed around. So bad.
+				Vector3D[] coords = TextureHelper.CalcViaProjections( p1, p2, p3, divisions, Geometry );
+				int[] elems = TextureHelper.TextureElements( 1, GeodesicLevels );
+				HashSet<H3.Cell.Edge> gEdges = new HashSet<H3.Cell.Edge>( new H3.Cell.EdgeEqualityComparer() );
+
+				// Due to symmetry, keep only edges incident with the first sextant.
+				System.Func<Vector3D, bool> inSextant = v =>
+				{
+					double angle = Euclidean2D.AngleToCounterClock( new Vector3D( 1, 0 ), v );
+					return (Tolerance.GreaterThanOrEqual( angle, 0 ) && Tolerance.LessThanOrEqual( angle, Math.PI / 3 ))
+						|| Tolerance.Equal( angle, 2 * Math.PI );
+				};
+
+				System.Func<int, Vector3D[]> elemVerts = i =>
+				{
+					int idx1 = i * 3;
+					int idx2 = i * 3 + 1;
+					int idx3 = i * 3 + 2;
+					return new Vector3D[]
+					{
+									coords[elems[idx1]],
+									coords[elems[idx2]],
+									coords[elems[idx3]]
+					};
+				};
+
+				if( IsGoldberg )
+				{
+					Dictionary<int, Vector3D> centers = new Dictionary<int, Vector3D>();
+					for( int i = 0; i < elems.Length / 3; i++ )
+						centers[i] = Util.Centroid( g, elemVerts( i ) );
+
+					var graph = TextureHelper.ElementGraph( 1, GeodesicLevels );
+					for( int i = 0; i < elems.Length / 3; i++ )
+					{
+						Vector3D start = centers[i];
+						int[] neighbors = graph[i];
+						foreach( int n in neighbors )
+						{
+							Vector3D end = new Vector3D();
+							if( n == -1 )
+								end = Mirrors[2].ReflectPoint( start );
+							else
+								end = centers[n];
+
+							if( inSextant( start ) || inSextant( end ) )
+								gEdges.Add( new H3.Cell.Edge( start, end ) );
+						}
+					}
+
+					edges.Clear();
+				}
+				else
+				{
+					for( int i = 0; i < elems.Length / 3; i++ )
+					{
+						Vector3D[] verts = elemVerts( i );
+						Vector3D v1 = verts[0], v2 = verts[1], v3 = verts[2];
+						if( inSextant( v1 ) )
+						{
+							gEdges.Add( new H3.Cell.Edge( v1, v2 ) );
+							gEdges.Add( new H3.Cell.Edge( v1, v3 ) );
+						}
+						if( inSextant( v2 ) || inSextant( v3 ) )
+							gEdges.Add( new H3.Cell.Edge( v2, v3 ) );
+					}
+				}
+
+				edges.Add( new EdgeInfo() { Edges = gEdges.ToArray(), Color = MixColor( color ), WidthFactor = 0.25 } );
 			}
 
 			private static H3.Cell.Edge[] SnubEdges( Vector3D startingPoint, CircleNE[] mirrors )
@@ -361,8 +442,7 @@
 				if( Q != -1 )
 					return;
 
-				if( Active.Length == 1 && Active[0] == 0 )
-					v *= 0.999;
+				v *= 0.999;
 			}
 
 			private void CalcCentering()
@@ -452,61 +532,16 @@
 					return result;
 				};
 
-				// So that we can leverage Euclidean barycentric coordinates, we will first convert our simplex to the Klein model.
-				// We will need to take care to properly convert back to the Ball as needed.
-				Vector3D[] kleinVerts = verts.Select( v =>
-				{
-					switch( g )
-					{
-					case Geometry.Spherical:
-						return SphericalModels.StereoToGnomonic( v );
-					case Geometry.Euclidean:
-						return v;
-					case Geometry.Hyperbolic:
-						return HyperbolicModels.PoincareToKlein( v );
-					}
-
-					throw new System.ArgumentException();
-				} ).ToArray();
-
-				// Normalizing barycentric coords amounts to making sure the 4 coords add to 1.
-				Func<Vector3D, Vector3D> baryNormalize = b =>
-				{
-					return b / (b.X + b.Y + b.Z);
-				};
-
-				// Bary Coords to Euclidean
-				Func<Vector3D[], Vector3D, Vector3D> baryToEuclidean = ( kv, b ) =>
-				{
-					Vector3D result =
-						kv[0] * b.X + kv[1] * b.Y + kv[2] * b.Z;
-					return result;
-				};
-
-				Func<Vector3D[], Vector3D, Vector3D> toConformal = ( kv, b ) =>
-				{
-					Vector3D klein = baryToEuclidean( kv, b );
-					switch( g )
-					{
-					case Geometry.Spherical:
-						return SphericalModels.GnomonicToStereo( klein );
-					case Geometry.Euclidean:
-						return klein;
-					case Geometry.Hyperbolic:
-						return HyperbolicModels.KleinToPoincare( klein );
-					}
-
-					throw new System.ArgumentException();
-				};
+				Vector3D[] kleinVerts = Util.KleinVerts( g, verts );
 
 				// Our starting barycentric coords (halfway between all active mirrors).
 				Vector3D bary = new Vector3D();
 				foreach( int a in activeMirrors )
 					bary[a] = 0.5;
-				bary = baryNormalize( bary );
+				bary = Util.BaryNormalize( bary );
 
 				// For each iteration, we'll shrink this search offset.
-				// NOTE: I'm not actually sure that the starting offset and decrease factor I'm using
+				// NOTE: I'm not sure that the starting offset and decrease factor I'm using
 				// guarantee convergence, but it seems to be working pretty well (even when varying these parameters).
 				double factor = 1.3;
 				double searchOffset = bary[activeMirrors[0]] / factor;
@@ -515,17 +550,17 @@
 				int iterations = 1000;
 				for( int i = 0; i < iterations; i++ )
 				{
-					min = diffFunc( toConformal( kleinVerts, bary ) );
+					min = diffFunc( Util.ToConformal( g, kleinVerts, bary ) );
 					foreach( int a in activeMirrors )
 					{
 						Vector3D baryTest1 = bary, baryTest2 = bary;
 						baryTest1[a] += searchOffset;
 						baryTest2[a] -= searchOffset;
-						baryTest1 = baryNormalize( baryTest1 );
-						baryTest2 = baryNormalize( baryTest2 );
+						baryTest1 = Util.BaryNormalize( baryTest1 );
+						baryTest2 = Util.BaryNormalize( baryTest2 );
 
-						double t1 = diffFunc( toConformal( kleinVerts, baryTest1 ) );
-						double t2 = diffFunc( toConformal( kleinVerts, baryTest2 ) );
+						double t1 = diffFunc( Util.ToConformal( g, kleinVerts, baryTest1 ) );
+						double t2 = diffFunc( Util.ToConformal( g, kleinVerts, baryTest2 ) );
 						if( t1 < min && baryTest1[a] > 0 && baryTest1[a] < 1 )
 						{
 							min = t1;
@@ -555,7 +590,7 @@
 					//throw new System.Exception( "Boo. We did not converge." );
 				}
 
-				return new Tuple<Vector3D, Vector3D>( toConformal( kleinVerts, bary ), bary );
+				return new Tuple<Vector3D, Vector3D>( Util.ToConformal( g, kleinVerts, bary ), bary );
 			}
 
 			public double DistInGeometry( Vector3D v1, Vector3D v2 )
@@ -679,6 +714,7 @@
 
 				// Awkward that I made the width values the euclidean value at the origin :( Worth changing?
 				double cutoff = settings.EdgeWidth * widthFactor;
+				double cutoffInGeometry = settings.DistInGeometry( new Vector3D( cutoff, 0 ), new Vector3D() );
 
 				p = m.Apply( p );
 
@@ -689,6 +725,11 @@
 				// Same side as endpoint?
 				Vector3D end = m.Apply( e.End );
 				if( p.AngleTo( end ) > Math.PI / 2 )
+					return false;
+
+				// Beyond the endpoint?
+				if( p.Abs() > end.Abs() && 
+					settings.DistInGeometry( p, end ) > cutoffInGeometry )
 					return false;
 
 				p.RotateXY( -a );
@@ -726,6 +767,11 @@
 				Vector3D end = m.Apply( e.End );
 				if( p.AngleTo( end ) > Math.PI / 2 )
 					dEdge = double.PositiveInfinity;
+				// Beyond the endpoint?
+				else if( p.Abs() > end.Abs() )
+				{
+					dEdge = settings.DistInGeometry( p, end );
+				}
 				else
 				{
 					p.RotateXY( -a );
@@ -1169,9 +1215,11 @@
 					break;
 			}
 
-			int idx = settings.ColorIndexForPoint( v );
-			if( settings.IsSnub )
+			int idx;
+			if( settings.IsSnub || settings.IsGoldberg )
 				idx = 0;
+			else
+				idx = settings.ColorIndexForPoint( v );
 			colors.Add( settings.Colors[idx] );
 
 			if( !within && reflections % 2 == 0 && settings.ShowCoxeter )
@@ -1255,7 +1303,14 @@
 
 		private Color ColorFunc4( Settings settings, Vector3D v, int[] flips, int[] allFlips )
 		{
-			//int reflections = flips.Sum();
+			foreach( var edgeInfo in settings.UniformEdges )
+			{
+				bool tWithin = edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor );
+				if( tWithin )
+					return Color.Black;
+			}
+
+			int reflections = flips.Sum();
 
 			// Reflect back so that we take up the entire polygon {p}.
 			int[] sequence = allFlips.Reverse().Where( m => m != 2 ).ToArray();
@@ -1269,10 +1324,9 @@
 				if( m_texture == null )
 				{
 
-					string path = System.IO.Path.Combine( Persistence.WorkingDir, "Nelson-25-Edit.JPG" );
+					string path = System.IO.Path.Combine( Persistence.WorkingDir, "gold.JPG" );
 					m_texture = new Bitmap( path );
 					m_texture.RotateFlip( RotateFlipType.RotateNoneFlipY );
-
 				}
 
 				double w = m_texture.Width;
@@ -1280,14 +1334,14 @@
 
 				// Scale v so that the image will cover the f.d.
 				double s = 1.0 / ((settings.Verts[0].Abs() + 1) / 2);
-				s *= 2.3;
-				v *= s;
+				//s *= 2.3;
+				//v *= s;
 
 				// Get the pixel coords.
 				double size = w < h ? w : h;
 				double x = (v.X + 1) / 2 * size;
 				double y = (v.Y + 1) / 2 * size;
-				y += 175;
+				/*y += 175;
 				x += 15;
 				y -= 0;
 				//x -= 25;
@@ -1298,14 +1352,21 @@
 				if( y < 0 )
 					y += h;
 				if( y >= h )
-					y -= h;
+					y -= h;*/
 
 				if( x < 0 || y < 0 ||
 					x >= w || y >= h )
 				//if( v.Abs() > 1.13 )
 					return Color.FromArgb( 255, 0, 0, 0 );
 
-				return m_texture.GetPixel( (int)x, (int)y );
+				Color result = m_texture.GetPixel( (int)x, (int)y );
+				double lOff = 0.1;
+				if( reflections % 2 == 0 )
+					// result = ColorUtil.AvgColorSquare( new List<Color>( new Color[] { result, ColorTranslator.FromHtml( "#2a3132" ) } ) );
+					result = ColorUtil.AdjustL( result, result.GetBrightness() - lOff );
+				else
+					result = ColorUtil.AdjustL( result, result.GetBrightness() + lOff );
+				return result;
 			}
 		}
 
