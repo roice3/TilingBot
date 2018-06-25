@@ -462,7 +462,7 @@
 					m.Isometry( Geometry, 0, Verts[2] );
 					break;
 				case Centering.Vertex:
-					m.Isometry( Geometry, 0, StartingPoint );
+					m = StartingPointMobius;
 					break;
 				}
 				Mobius = m;
@@ -954,7 +954,7 @@
 				}
 			}
 
-			// Apply the random one.
+			// Apply the centering one.
 			Mobius m = m_settings.Mobius;
 			v = m.Apply( v );
 
