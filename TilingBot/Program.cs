@@ -1,6 +1,7 @@
 ﻿namespace TilingBot
 {
 	using R3.Core;
+	using R3.Drawing;
 	using R3.Geometry;
 	using R3.Math;
 	using System;
@@ -23,9 +24,17 @@
 				if( args.Length == 1 && args[0] == "-Tweet" )
 					tweet = true;
 
+				if( args.Length == 1 && args[0] == "-TestQueue" )
+				{
+					TestCurrentQueue();
+					return;
+				}
+
 				int batch = 1;
 				for( int i = 0; i < batch; i++ )
 					BotWork( tweet );
+
+				//Animate();
 			}
 			catch( Exception e )
 			{
@@ -73,6 +82,91 @@
 				Tweet.Send( message, newPath ).Wait();
 
 				// Move to tweeted directory.
+			}
+		}
+
+		static void TestCurrentQueue()
+		{
+			string localWorkingDir = Persistence.WorkingDir;
+			string testDir = Path.Combine( localWorkingDir, "queueTest" );
+			DirectoryInfo di = new DirectoryInfo( testDir );
+			foreach( FileInfo file in di.GetFiles() )
+				file.Delete();
+
+			string workingDir = @"D:\Dropbox\TilingBot\working\";
+			Persistence.WorkingDir = workingDir;
+			string[] queue = File.ReadAllLines( Persistence.QueueFile );
+			List<string> tweetStrings = new List<string>();
+			foreach( string qi in queue )
+			{
+				m_timestamp = DateTime.Now;
+				string fullPath = Path.Combine( Persistence.QueueDir, qi + ".xml" );
+				Tiler.Settings settings = Persistence.LoadSettings( fullPath );
+				StandardInputs( settings );
+				settings.FileName = FormatFileName() + ".png";
+
+				string tweetString = Tweet.Format( settings );
+				Console.WriteLine( tweetString + "\n" );
+				tweetStrings.Add( tweetString );
+				MakeTiling( settings );
+
+				string imagePath = settings.FileName;
+				string newPath = Path.Combine( testDir, imagePath );
+				File.Move( imagePath, newPath );
+			}
+
+			File.WriteAllLines( Path.Combine( testDir, "tweetStrings.txt" ), tweetStrings.ToArray() );
+		}
+
+		static void Animate()
+		{
+			Tiler.Settings settings = GenSettings( tweeting: false );
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-7-07_22-44-25.xml" ) );
+			StandardInputs( settings );
+			settings.Centering = Tiler.Centering.General;	// We will control the Mobius transformation ourself.
+
+			int numFrames = Test.IsTesting ? 6 : 90;
+			Vector3D pStart = settings.Verts[2];
+			double dist = Spherical2D.s2eNorm( Spherical2D.e2sNorm( settings.Verts[1].Abs() ) * 2 ) * Math.Sqrt( 2 ) / 2;
+			Vector3D pEnd = new Vector3D( dist, dist );
+
+			//Vector3D pEnd = pStart;
+			//pEnd.RotateXY( 2 * Math.PI / settings.P );
+
+			Vector3D[] points = TextureHelper.SubdivideSegmentInGeometry( pStart, pEnd, numFrames, settings.Geometry );
+
+			for( int i=0; i<numFrames; i++ )
+			{
+				string numString = i.ToString();
+				numString = numString.PadLeft( 3, '0' );
+				settings.FileName = "frame" + numString + ".png";
+
+				// Setup the Mobius.
+				Vector3D pCurrent = points[i];
+				Mobius m = new Mobius();
+
+				//m.Isometry( settings.Geometry, Math.PI / 4, pCurrent.ToComplex() );
+				//m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
+
+				/* Limit rotation
+				Mobius mRot = new Mobius(), mEdge = new Mobius(), mOff = new Mobius();
+				mRot.Isometry( Geometry.Euclidean, Math.PI, new Complex() );
+				mEdge.Isometry( settings.Geometry, Math.PI / settings.P, settings.Verts[1] );   // Edge-centered
+				mOff.Isometry( Geometry.Euclidean, 0, new Complex( (double)i/numFrames, 0 ) );
+				m = mEdge * HyperbolicModels.UpperInv * mOff * HyperbolicModels.Upper * mRot;
+				*/
+
+				// Rotation
+				double frac = (double)i / numFrames;
+				m.Isometry( settings.Geometry, frac * Math.PI / 3, new Complex() );
+
+				settings.Mobius = m;
+
+				Console.WriteLine( Tweet.Format( settings ) + "\n" );
+				MakeTiling( settings );
+				string newPath = Path.Combine( Persistence.AnimDir, settings.FileName );
+				File.Delete( newPath );
+				File.Move( settings.FileName, newPath );
 			}
 		}
 
@@ -261,7 +355,6 @@
 				}
 			}
 
-			settings.Mobius = RandomMobius( settings, rand );
 			settings.ShowCoxeter = RandBoolWeighted( rand, .7 );
 
 			RandomizeColors( settings, rand );
@@ -284,28 +377,6 @@
 			int size = Test.IsTesting ? 900 : 1200;
 			settings.Width = size;
 			settings.Height = size;
-		}
-
-		private static Tiler.Settings GenSettings( bool tweeting )
-		{
-			Tiler.Settings settings = new Tiler.Settings();
-			RandomizeInputs( settings );
-			Test.InputsTesting( ref settings );
-			if( tweeting && !Test.IsTesting )
-			{
-				string next = Persistence.NextInQueue();
-				string queueDir = Persistence.QueueDir;
-				string fullPath = Path.Combine( queueDir, next + ".xml" );
-				if( File.Exists( fullPath ) )
-				{
-					settings = Persistence.LoadSettings( fullPath );
-					Persistence.Move( next, queueDir, Path.Combine( queueDir, "done" ) );
-				}
-				Persistence.PopQueue();
-			}
-
-			StandardInputs( settings );
-			settings.FileName = FormatFileName() + ".png";
 
 			double diskBounds = 1.01;
 			switch( settings.Geometry )
@@ -345,8 +416,33 @@
 				}
 				break;
 			}
-			settings.Init();
 
+			// We need to always do this at the end, because it can depend on the randomized geometry.
+			settings.Mobius = RandomMobius( settings, new System.Random() );
+
+			settings.Init();
+		}
+
+		private static Tiler.Settings GenSettings( bool tweeting )
+		{
+			Tiler.Settings settings = new Tiler.Settings();
+			RandomizeInputs( settings );
+			Test.InputsTesting( ref settings );
+			if( tweeting && !Test.IsTesting )
+			{
+				string next = Persistence.NextInQueue();
+				string queueDir = Persistence.QueueDir;
+				string fullPath = Path.Combine( queueDir, next + ".xml" );
+				if( File.Exists( fullPath ) )
+				{
+					settings = Persistence.LoadSettings( fullPath );
+					Persistence.Move( next, queueDir, Path.Combine( queueDir, "done" ) );
+				}
+				Persistence.PopQueue();
+			}
+
+			settings.FileName = FormatFileName() + ".png";
+			StandardInputs( settings );
 			return settings;
 		}
 

@@ -12,6 +12,9 @@
 		{
 			get
 			{
+				if( !string.IsNullOrEmpty( m_working ) )
+					return m_working;
+
 				string working = "working";
 				string current = Directory.GetCurrentDirectory();
 				string dir = Path.Combine( current, working );
@@ -22,7 +25,12 @@
 				string dev = Directory.GetParent( current ).Parent.FullName;
 				return Path.Combine( dev, working );
 			}
+			set
+			{
+				m_working = value;
+			}
 		}
+		private static string m_working = string.Empty;
 
 		public static void Move( string fileSansExtension, string from, string to )
 		{
@@ -32,6 +40,15 @@
 				File.Move(
 					Path.Combine( from, file ),
 					Path.Combine( to, file ) );
+			}
+		}
+
+		public static string AnimDir
+		{
+			get
+			{
+				string anim = "anim";
+				return Path.Combine( WorkingDir, anim );
 			}
 		}
 

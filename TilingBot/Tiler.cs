@@ -652,7 +652,7 @@
 				for( int i=0; i<testOrder.Count; i++ )
 				{
 					double a = ei.AngleTo( Geometry, test, testOrder[i] );
-					if( a < 0 )
+					if( Tolerance.LessThanOrEqual( a, 0 ) )
 						return testOrder[i];
 				}
 
@@ -1237,13 +1237,14 @@
 		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, bool hexagonColoring = false )
 		{
 			int reflections = flips.Sum();
+			bool useStandardColors = ColoringData( settings, 0 ) == 0;
 
 			List<Color> colors = new List<Color>();
 			foreach( var edgeInfo in settings.UniformEdges )
 			{
 				if( edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor ) )
 				{
-					colors.Add( edgeInfo.Color );
+					colors.Add( useStandardColors ? edgeInfo.Color : settings.Colors[0] );
 				}
 			}
 

@@ -3,6 +3,7 @@ Known Issues
 - Coloring on rectifieds.
 - Iterating to starting point doesn't always converge, which could cause missed tweets.
 - “vertex-centered” can we make orientation better?
+- centering not reported correctly on Mercator projection.
 
 Work Debt
 - Publish R3.Core on Nuget: https://docs.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio
@@ -39,10 +40,6 @@ Variability Ideas or Improvement
 - More than one uniform on a single tiling? Or uniform + dual on same tiling.
 - Other decorations (e.g. set of random points inside fundamental domain)
 - Better colors. Why do reds seem to rarely get picked? More color functions. Same saturation/intensity for all color choices?
-
-Fun ideas
-- Pixellated. 
-- Euclidean tiling on a pixelated hyperbolic grid?
 
 Research Ideas:
 - non-repeating tiling with infinite number of tiles possible? Or maybe just tilings that transition between different tilings, say from {7,3} to 14-gons.
