@@ -211,6 +211,15 @@
 				}
 			}
 
+			public bool IsRegularDual
+			{
+				get
+				{
+					// NOTE! Our code does not pay attention to the "Dual" flag for regular tilings.
+					return Active.Length == 1 && Active[0] == 2;
+				}
+			}
+
 			public bool IsCatalanDual
 			{
 				get
@@ -585,7 +594,7 @@
 				if( !Tolerance.Equal( min, 0.0, 1e-14 ) )
 				{
 					System.Console.WriteLine( "Did not converge: " + min );
-					System.Console.WriteLine( string.Format( "{{{0},{1}}} {2}", P, Q, TilingBot.Tweet.ActiveMirrorsString( this ) ) );
+					System.Console.WriteLine( TilingBot.Tweet.Format( this ) );
 					System.Console.ReadKey( true );
 					//throw new System.Exception( "Boo. We did not converge." );
 				}

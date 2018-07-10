@@ -277,14 +277,8 @@
 			if( RandBool( rand ) ) active.Add( 2 );
 			if( active.Count == 0 )
 				active.Add( 0 );
-			if( active.Count == 1 && active[0] == 2 )
-			{
-				// Keeps things simpler in terms of tweet strings.
-				active[0] = 0;
-				settings.P = q;
-				settings.Q = p;
-			}
 			settings.Active = active.ToArray();
+			settings.Dual = RandBoolWeighted( rand, .2 );
 
 			settings.EdgeWidth = RandDouble( rand, 0, .05 );
 			settings.VertexWidth = RandDouble( rand, 0, .075 );
@@ -356,8 +350,8 @@
 			}
 
 			settings.ShowCoxeter = RandBoolWeighted( rand, .7 );
-
 			RandomizeColors( settings, rand );
+			settings.Mobius = RandomMobius( settings, new System.Random() );
 		}
 
 		public static void RandomizeColors( Tiler.Settings settings, Random rand )
@@ -416,9 +410,6 @@
 				}
 				break;
 			}
-
-			// We need to always do this at the end, because it can depend on the randomized geometry.
-			settings.Mobius = RandomMobius( settings, new System.Random() );
 
 			settings.Init();
 		}

@@ -1,6 +1,7 @@
 ﻿namespace TilingBot
 {
 	using LinqToTwitter;
+	using R3.Core;
 	using R3.Geometry;
 	using System;
 	using System.Collections.Generic;
@@ -85,9 +86,13 @@
 
 		private static string ShortDesc( Tiler.Settings settings )
 		{
+			string p = InfinitySafe( settings.P );
+			string q = InfinitySafe( settings.Q );
+			if( settings.IsRegularDual )
+				Utils.Swap( ref p, ref q );
+
 			string uniformDesc = UniformDesc( settings, false );
-			return string.Format( "{0} {{{1},{2}}}", uniformDesc,
-				InfinitySafe( settings.P ), InfinitySafe( settings.Q ) );
+			return string.Format( "{0} {{{1},{2}}}", uniformDesc, p, q );
 		}
 
 		private static string GeodesicString( Tiler.Settings settings )
@@ -132,6 +137,10 @@
 			// We may not be able to describe this well in all cases, so typically we just return nothing.
 			//
 
+			if( settings.Geometry == Geometry.Spherical &&
+				settings.SphericalModel == SphericalModel.Mercator )
+				return string.Empty;
+
 			if( settings.Geometry == Geometry.Euclidean &&
 				settings.EuclideanModel == EuclideanModel.UpperHalfPlane )
 				return string.Empty;
@@ -141,7 +150,7 @@
 				return string.Empty;
 
 			if( settings.Centering == Tiler.Centering.General )
-				return " uncentered";
+				return string.Empty;
 
 			string vertexCentered = " vertex-centered";
 			string edgeCentered = " edge-centered";
@@ -277,44 +286,6 @@
 			return prefix + model + postfix;
 		}
 
-		internal static string ActiveMirrorsString( Tiler.Settings settings )
-		{
-			List<string> mirrorDesc = new List<string>();
-			foreach( int a in settings.Active )
-			{
-				switch( a )
-				{
-				case 0:
-					mirrorDesc.Add( "first" );
-					break;
-				case 1:
-					mirrorDesc.Add( "second" );
-					break;
-				case 2:
-					mirrorDesc.Add( "third" );
-					break;
-				}
-			}
-			string temp = mirrorDesc[0];
-			if( mirrorDesc.Count == 2 )
-				temp += " and " + mirrorDesc[1];
-			if( mirrorDesc.Count == 3 )
-				temp = "All";
-
-			// Make first char uppercase.
-			temp = temp.First().ToString().ToUpper() + temp.Substring( 1 );
-
-			string uniformDesc = UniformDesc( settings );
-			string of = "of the fundamental triangle";
-			string activeString = string.Format( "{0} mirror{1} active{2}.", temp,
-				settings.Active.Length > 1 ?
-					"s " + of + " are" :
-					" " + of + " is",
-				uniformDesc );
-
-			return activeString;
-		}
-
 		private static string UniformDesc( Tiler.Settings settings, bool addParenthesis = true )
 		{
 			var m = settings.Active;
@@ -333,7 +304,8 @@
 				}
 				else if( m[0] == 2 )
 				{
-					uniformDesc = "dual to";
+					// We'll handle duals by switching p and q in the description.
+					uniformDesc = "regular";
 				}
 			}
 			else if( m.Length == 2 )
