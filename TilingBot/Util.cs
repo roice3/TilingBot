@@ -69,16 +69,37 @@
 			return v1.Dot( v2 );
 		}
 
+		public static void NormalizeInGeometry( Geometry g, ref Vector3D v )
+		{
+			switch( g )
+			{
+			case Geometry.Spherical:
+				v.Normalize();
+				break;
+			case Geometry.Euclidean:
+				throw new System.NotImplementedException();
+			case Geometry.Hyperbolic:
+				Sterographic.NormalizeToHyperboloid( ref v );
+				break;
+			}
+		}
+
 		public static Vector3D Centroid( Geometry g, Vector3D[] conformalVerts )
 		{
+			if( g == Geometry.Euclidean )
+			{
+				Vector3D result = new Vector3D();
+				foreach( Vector3D v in conformalVerts )
+					result += v;
+				return result / conformalVerts.Length;
+			}
+
 			Vector3D[] verts = conformalVerts.Select( v =>
 			{
 				switch( g )
 				{
 				case Geometry.Spherical:
 					return Sterographic.PlaneToSphereSafe( v );
-				case Geometry.Euclidean:
-					return v;
 				case Geometry.Hyperbolic:
 					return Sterographic.PlaneToHyperboloid( v );
 				}
@@ -91,19 +112,22 @@
 			for( int i = 0; i < verts.Length; i++ )
 				sum += verts[i];
 			Vector3D centroid = sum / Math.Sqrt( DotInGeometry( g, sum, sum ) );
-			Sterographic.NormalizeToHyperboloid( ref centroid );
+			NormalizeInGeometry( g, ref centroid );
 
 			switch( g )
 			{
 			case Geometry.Spherical:
 				return Sterographic.SphereToPlane( centroid );
-			case Geometry.Euclidean:
-				return centroid;
 			case Geometry.Hyperbolic:
 				return Sterographic.HyperboloidToPlane( centroid );
 			}
 
 			throw new System.ArgumentException();
+		}
+
+		public static double Smoothed( double input, double max )
+		{
+			return (max / 2.0) * (-Math.Cos( Math.PI * input / max ) + 1);
 		}
 	}
 }

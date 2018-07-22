@@ -69,7 +69,7 @@
 				additionalInfo = Capitalize( ShortDesc( settings ) ) + ".";
 			}
 																		
-			if( settings.IsSnub )
+			if( settings.IsSnub && !settings.Dual )
 				link = @"https://en.wikipedia.org/wiki/Snub_(geometry)";
 			if( !string.IsNullOrEmpty( link ) )
 				link = " " + link;

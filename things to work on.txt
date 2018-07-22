@@ -4,12 +4,12 @@ Known Issues
 - Iterating to starting point doesn't always converge, which could cause missed tweets.
 - “vertex-centered” can we make orientation better?
 - centering not reported correctly on Mercator projection.
+- Mobius transforms can get out-of-sync with model in Euclidean case. Could make this safer.
 
 Work Debt
 - Publish R3.Core on Nuget: https://docs.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio
 
 Tiling ideas
-- Johnson solid analogue in hyperbolic plane?
 - prisms/antiprism
 - Circles that are in-circles of the F.D.
 - Animations
@@ -23,6 +23,8 @@ Tiling ideas
 - circles emanating from F.D. verts., like MagicTile
 - support tilings I've emailed myself
 - support for "mosaic" tilings, i.e. subdivide F.D. into Vornoi cells.
+- additional operations, e.g. truncating snubs (which make them non-uniform)
+- line-like drawimgs https://twitter.com/rafaela31416/status/1019520934724689920
 
 Feature Ideas
 - support custom tweet strings, and maybe specialized code for "requested by"
@@ -42,5 +44,6 @@ Variability Ideas or Improvement
 - Better colors. Why do reds seem to rarely get picked? More color functions. Same saturation/intensity for all color choices?
 
 Research Ideas:
+- Johnson solid analogue in hyperbolic plane?
 - non-repeating tiling with infinite number of tiles possible? Or maybe just tilings that transition between different tilings, say from {7,3} to 14-gons.
 - How do {5,3} and {7,3} interact on same image? (orthographic projections)

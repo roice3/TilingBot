@@ -149,9 +149,56 @@
 				CalcCentering();
 			}
 
-			private void CalcMirrors()
+			internal bool iiMirrors()
+			{
+				if( P != -1 || Q != -1 )
+					return false;
+
+				Vector3D p1 = new Vector3D( 1, 0 );
+				Vector3D p2 = new Vector3D( 0, 1 - Math.Sqrt( 2 ) );
+				Vector3D p3 = new Vector3D( -1, 0 );
+
+				Circle3D arcCircle;
+				H3Models.Ball.OrthogonalCircleInterior( p1, p2, out arcCircle );
+				Segment seg1 = Segment.Arc( p1, p2, arcCircle.Center, clockwise: true );
+				H3Models.Ball.OrthogonalCircleInterior( p2, p3, out arcCircle );
+				Segment seg2 = Segment.Arc( p2, p3, arcCircle.Center, clockwise: true );
+
+				Vector3D[] verts = new Vector3D[]
+				{
+					p1,
+					p2,
+					p3,
+				};
+
+				Circle[] circles = new Circle[]
+				{
+					new Circle( seg2.P1, seg2.Midpoint, seg2.P2 ),
+					new Circle( verts[0], verts[2] ),
+					new Circle( seg1.P1, seg1.Midpoint, seg1.P2 ),
+				};
+
+				// The oriented mirrors.
+				// We can use the opposing vertex to determine the orientation.
+				Mirrors = new CircleNE[]
+				{
+					new CircleNE( circles[0], verts[0] ),
+					new CircleNE( circles[1], verts[1] ),
+					new CircleNE( circles[2], verts[2] ),
+				};
+				for( int i = 0; i < 3; i++ )
+					Mirrors[i].CenterNE = Mirrors[i].ReflectPoint( Mirrors[i].CenterNE );
+
+				Verts = verts;
+				return true;
+			}
+
+			internal void CalcMirrors()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
+
+				if( iiMirrors() )
+					return;
 
 				TilingConfig config = new TilingConfig( P, Q, 1 );
 				Tile baseTile = Tiling.CreateBaseTile( config );
@@ -171,7 +218,7 @@
 				{
 					new Circle( verts[2], verts[1] ),	// Line
 					new Circle( verts[2], verts[0] ),	// Line
-					seg.Type == SegmentType.Arc ? new Circle( seg.P1, seg.Midpoint, seg.P2 ) : new Circle( verts[1], verts[0] ),	// Arc or Line
+					seg.Type == SegmentType.Arc ? new Circle( seg.P1, seg.Midpoint, seg.P2 ) : new Circle( verts[1], verts[0] ),    // Arc or Line
 				};
 
 				// The oriented mirrors.
@@ -284,7 +331,7 @@
 				List<EdgeInfo> edges = new List<EdgeInfo>();
 				foreach( int[] active in activeSet )
 				{
-					if( IsCatalanDual && !IsGoldberg )
+					if( IsCatalanDual && !IsGoldberg && !Snub )
 					{
 						var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
 						Color color = MixColor( starting.Item2 );
@@ -327,7 +374,7 @@
 
 				if( IsSnub )
 				{
-					H3.Cell.Edge[] snubEdges = SnubEdges( this.StartingPoint, this.Mirrors );
+					H3.Cell.Edge[] snubEdges = SnubEdges( this );
 					EdgeInfo ei = new EdgeInfo() { Edges = snubEdges.ToArray(), Color = edges[0].Color };
 					edges.Clear();
 					edges.Add( ei );
@@ -372,9 +419,9 @@
 					int idx3 = i * 3 + 2;
 					return new Vector3D[]
 					{
-									coords[elems[idx1]],
-									coords[elems[idx2]],
-									coords[elems[idx3]]
+						coords[elems[idx1]],
+						coords[elems[idx2]],
+						coords[elems[idx3]]
 					};
 				};
 
@@ -423,8 +470,11 @@
 				edges.Add( new EdgeInfo() { Edges = gEdges.ToArray(), Color = MixColor( color ), WidthFactor = 0.25 } );
 			}
 
-			private static H3.Cell.Edge[] SnubEdges( Vector3D startingPoint, CircleNE[] mirrors )
+			private static H3.Cell.Edge[] SnubEdges( Settings settings )
 			{
+				Vector3D startingPoint = settings.StartingPoint;
+				CircleNE[] mirrors = settings.Mirrors;
+
 				System.Func<int, int, Vector3D> end = ( i1, i2 ) =>
 				{
 					Vector3D e = mirrors[i1].ReflectPoint( startingPoint );
@@ -432,17 +482,32 @@
 					return e;
 				};
 
-				HashSet<Vector3D> endingPoints = new HashSet<Vector3D>();
+				List<Vector3D> endingPoints = new List<Vector3D>();
 				endingPoints.Add( end( 0, 1 ) );
-				endingPoints.Add( end( 0, 2 ) );
-				endingPoints.Add( end( 1, 0 ) );
-				endingPoints.Add( end( 1, 2 ) );
 				endingPoints.Add( end( 2, 1 ) );
-				endingPoints.Add( end( 2, 0 ) );
+				endingPoints.Add( end( 1, 2 ) );
+				endingPoints.Add( end( 0, 2 ) );	// == 2, 0
+				endingPoints.Add( end( 1, 0 ) );
 
 				List<H3.Cell.Edge> snubEdges = new List<H3.Cell.Edge>();
-				foreach( Vector3D v in endingPoints )
-					snubEdges.Add( new H3.Cell.Edge( startingPoint, v, order: false ) );
+				if( settings.Dual )
+				{
+					Vector3D p1 = Util.Centroid( settings.Geometry, new Vector3D[] { startingPoint, endingPoints[0], endingPoints[1] } );
+					Vector3D p2 = Util.Centroid( settings.Geometry, new Vector3D[] { startingPoint, endingPoints[2], endingPoints[3] } );
+					Vector3D p3 = Util.Centroid( settings.Geometry, new Vector3D[] { startingPoint, endingPoints[3], endingPoints[4] } );
+					bool order = false;
+					snubEdges.Add( new H3.Cell.Edge( settings.Verts[2], p1, order ) );
+					snubEdges.Add( new H3.Cell.Edge( p1, settings.Verts[0], order ) );
+					snubEdges.Add( new H3.Cell.Edge( settings.Verts[0], p2, order ) );
+					snubEdges.Add( new H3.Cell.Edge( p2, p3, order ) );
+					snubEdges.Add( new H3.Cell.Edge( p3, settings.Verts[2], order ) );
+				}
+				else
+				{
+					foreach( Vector3D v in endingPoints )
+						snubEdges.Add( new H3.Cell.Edge( startingPoint, v, order: false ) );
+				}
+				
 				return snubEdges.ToArray();
 			}
 
@@ -847,6 +912,7 @@
 							Vector3D v = new Vector3D( xa, ya );
 
 							Color color;
+							//v = ApplyTransformation( v );
 							if( !OutsideBoundary( settings, v, out color ) )
 							{
 								v = ApplyTransformation( v );
@@ -866,6 +932,7 @@
 						{
 							Vector3D v = new Vector3D( x, y );
 							Color color;
+							//v = ApplyTransformation( v );
 							if( !OutsideBoundary( settings, v, out color ) )
 							{
 								v = ApplyTransformation( v );
@@ -1193,7 +1260,8 @@
 			} );
 
 			List<Vector3D> pointsToTry = new List<Vector3D>();
-			if( reflections % 2 == 1 && settings.IsSnub )
+			int compare = settings.Dual ? 0 : 1; // This is for better coloring on duals to snubs.
+			if( reflections % 2 == compare && settings.IsSnub )
 			{
 				pointsToTry.Add( settings.Mirrors[0].ReflectPoint( v ) );
 				pointsToTry.Add( settings.Mirrors[1].ReflectPoint( v ) );
@@ -1251,13 +1319,23 @@
 			List<Color> colors = new List<Color>();
 			foreach( var edgeInfo in settings.UniformEdges )
 			{
-				if( edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor ) )
+				if( useStandardColors )
 				{
-					colors.Add( useStandardColors ? edgeInfo.Color : settings.Colors[0] );
+					if( edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor ) )
+						colors.Add( edgeInfo.Color );
+				}
+				else
+				{
+					for( int i = 0; i < edgeInfo.Edges.Length; i++ )
+					{
+						if( edgeInfo.PointWithinDist( settings, v, i, edgeInfo.WidthFactor ) )
+							colors.Add( settings.Colors[i] );
+					}
 				}
 			}
 
 			Color whitish = ColorTranslator.FromHtml( "#F1F1F2" );
+			//Color whitish = Color.FromArgb( 0, 0, 0, 0 );
 			Color darkish = ColorTranslator.FromHtml( "#BCBABE" );
 			if( hexagonColoring )
 			{
@@ -1265,10 +1343,10 @@
 				int offset = 18;
 				int count = settings.ShowCoxeter ? reflections : flips[2];
 				whitish = ColorUtil.ColorAlongHexagon( incrementsUntilRepeat, count + offset );
-				Color edgeColor = ColorUtil.Inverse( whitish );
+				/*Color edgeColor = ColorUtil.Inverse( whitish );
 				if( colors.Count > 0 )
 					return edgeColor;
-				return whitish;
+				return whitish;*/
 			}
 
 			if( colors.Count > 0 )
