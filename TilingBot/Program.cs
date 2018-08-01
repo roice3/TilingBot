@@ -121,7 +121,7 @@
 		static void Animate()
 		{
 			Tiler.Settings settings = GenSettings( tweeting: false );
-			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-7-21_11-47-06.xml") );
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-7-24_23-19-56.xml" ) );
 			StandardInputs( settings );
 			settings.Centering = Tiler.Centering.General;	// We will control the Mobius transformation ourself.
 
@@ -134,25 +134,6 @@
 			//pEnd.RotateXY( 2 * Math.PI / settings.P );
 
 			Vector3D[] points = TextureHelper.SubdivideSegmentInGeometry( pStart, pEnd, numFrames, settings.Geometry );
-
-			Vector3D e1, e2;
-			H3Models.Ball.GeodesicIdealEndpoints( settings.Verts[0], settings.Verts[1], out e1, out e2 );
-			e1.RotateXY( 4 * 2 * Math.PI / 6 );
-			e2.RotateXY( 4 * 2 * Math.PI / 6 );
-			Circle3D circ = H3Models.Ball.OrthogonalCircle( e1, e2 );
-			Vector3D r = e1 - circ.Center;
-
-			Vector3D f1, f2;
-			Euclidean2D.IntersectionLineCircle( new Vector3D(0,-1), new Vector3D( 1, -1 ), circ.ToFlatCircle(), out f1, out f2 );
-			double aTot = r.AngleTo( f1 - circ.Center );
-			List<Vector3D> pointList = new List<Vector3D>();
-			for( int i = 0; i < numFrames; i++ )
-			{
-				double a = Util.Smoothed( aTot * i / numFrames, aTot );
-				Vector3D current = r;
-				current.RotateXY( a );
-				pointList.Add( current + circ.Center );
-			}
 
 			for( int i=0; i<numFrames; i++ )
 			{
@@ -177,21 +158,12 @@
 
 				// Rotation
 				double frac = (double)i / numFrames;
-				//m.Isometry( settings.Geometry, frac * Math.PI / 3, new Complex() );
-				m.Isometry( settings.Geometry, -frac * 2 * Math.PI / 4, new Complex() );
+				double xOff = -Spherical2D.s2eNorm( 2 * Geometry2D.GetTriangleQSide( settings.P, settings.Q ) );
+				m = RotAboutPoint( settings, new Vector3D( xOff, 0 ), frac * 2 * Math.PI / settings.P );
 
-				Mobius m2 = new Mobius(), m3 = new Mobius();
-				m2.Isometry( settings.Geometry, 0, -settings.Verts[0] );
-				m3.Isometry( settings.Geometry, Math.PI / 2, new Complex() );
+				//settings.Mobius = m;
+				settings.Anim = Util.Smoothed( frac, 1.0 );
 
-				f1 = pointList[i];
-				f2 = pointList[i]; f2.X *= -1;
-				m.MapPoints(
-					f1.ToComplex(), new Complex( 0, -1 ), f2.ToComplex(),
-					e1.ToComplex(), new Complex( 0, -1 ), e2.ToComplex() );
-
-				settings.Mobius = m;
-				//settings.Mobius = m2.Inverse() * m * m2 * m3;
 
 				Console.WriteLine( Tweet.Format( settings ) + "\n" );
 				MakeTiling( settings );
@@ -199,6 +171,14 @@
 				File.Delete( newPath );
 				File.Move( settings.FileName, newPath );
 			}
+		}
+
+		static Mobius RotAboutPoint( Tiler.Settings settings, Vector3D p, double rot )
+		{
+			Mobius m1 = new Mobius(), m2 = new Mobius();
+			m1.Isometry( settings.Geometry, 0, p );
+			m2.Isometry( settings.Geometry, rot, new Complex() );
+			return m1 * m2 * m1.Inverse();
 		}
 
 		static string FormatFileName()

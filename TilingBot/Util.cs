@@ -1,7 +1,9 @@
 ﻿namespace TilingBot
 {
+	using Meta.Numerics.Functions;
 	using R3.Geometry;
 	using System.Linq;
+	using System.Numerics;
 	using Math = System.Math;
 
 	public class Util
@@ -128,6 +130,44 @@
 		public static double Smoothed( double input, double max )
 		{
 			return (max / 2.0) * (-Math.Cos( Math.PI * input / max ) + 1);
+		}
+
+		/// <summary>
+		/// https://paramanands.blogspot.com/2011/01/elliptic-functions-complex-variables.html#.W14TVtJKiUl
+		/// equation 14.
+		/// </summary>
+		public static Complex JacobiCn( Complex u, double k )
+		{
+			// k prime
+			double k_ = Math.Sqrt( 1 - k * k );
+
+			double cnx = AdvancedMath.JacobiCn( u.Real, k );
+			double snx = AdvancedMath.JacobiSn( u.Real, k );
+			double dnx = AdvancedMath.JacobiDn( u.Real, k );
+			double cny = AdvancedMath.JacobiCn( u.Imaginary, k_ );
+			double sny = AdvancedMath.JacobiSn( u.Imaginary, k_ );
+			double dny = AdvancedMath.JacobiDn( u.Imaginary, k_ );
+
+			double denom = cny * cny + k * k * snx * snx * sny * sny;
+			double real = cnx * cny / denom;
+			double imag = -snx * dnx * sny * dny / denom;
+
+			return new Complex( real, imag );
+		}
+
+		/// <summary>
+		/// See this paper: http://archive.bridgesmathart.org/2016/bridges2016-179.pdf
+		/// This logically belongs in HyperbolicModels.cs, but I didn't want the dependency on Meta.Numerics in R3.Core.
+		/// </summary>
+		public static Vector3D SquareToPoincare( Vector3D s )
+		{
+			double K_e = AdvancedMath.EllipticF( Math.PI / 2, 1.0 / Math.Sqrt( 2 ) );
+			Complex a = new Complex( 1, -1 ) / Math.Sqrt( 2 );
+			Complex b = new Complex( 1, 1 ) / 2;
+			Complex z = s;
+
+			Complex result = a * JacobiCn( K_e * ( b * z - 1 ), 1 / Math.Sqrt( 2 ) );
+			return Vector3D.FromComplex( result );
 		}
 	}
 }

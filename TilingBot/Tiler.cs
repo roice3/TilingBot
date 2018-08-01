@@ -113,6 +113,11 @@
 			public string FileName { get; set; }
 			public bool Antialias { get; set; }
 
+			/// <summary>
+			/// Used for animations, in range [0,1]
+			/// </summary>
+			public double Anim { get; set; }
+
 			public Geometry Geometry
 			{
 				get
@@ -1008,6 +1013,12 @@
 						break;
 					case HyperbolicModel.Klein:
 						v = HyperbolicModels.KleinToPoincare( v );
+						/*double mag = HyperbolicModels.KleinToPoincare( v.Dot( v ));
+						double mag1 = v.Abs();
+						double mag2 = mag1 * mag;
+						double magc = mag1 + (mag2 - mag1) * m_settings.Anim;
+						v.Normalize();
+						v *= magc;*/
 						break;
 					case HyperbolicModel.UpperHalfPlane:
 						{
@@ -1024,6 +1035,9 @@
 						}
 					case HyperbolicModel.Orthographic:
 						v = HyperbolicModels.OrthoToPoincare( v );
+						break;
+					case HyperbolicModel.Square:
+						v = Util.SquareToPoincare( v );
 						break;
 					}
 					break;
@@ -1092,6 +1106,8 @@
 						compare = -v.Y;
 					else if( settings.HyperbolicModel == HyperbolicModel.Band )
 						compare = Math.Abs( v.Y );
+					else if( settings.HyperbolicModel == HyperbolicModel.Square )
+						compare = Math.Max( Math.Abs( v.X ), Math.Abs( v.Y ) );
 				}
 
 				if( compare > 1.00133 )

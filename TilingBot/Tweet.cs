@@ -278,6 +278,9 @@
 					case HyperbolicModel.Orthographic:
 						model = "orthographic";
 						break;
+					case HyperbolicModel.Square:
+						model = "conformal square";
+						break;
 					}
 					break;
 				}
