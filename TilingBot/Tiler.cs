@@ -339,8 +339,8 @@
 					if( IsCatalanDual && !IsGoldberg && !Snub )
 					{
 						var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
+						StartingPoint = starting.Item1;
 						Color color = MixColor( starting.Item2 );
-						// Do we need to set the global variable here?
 
 						// The edges are just the mirrors in this case.
 						List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
@@ -359,9 +359,6 @@
 
 						// Cache it. This is not global at the level of settings, so we may need to adjust in the future.
 						StartingPoint = startingPoint;
-						Mobius m = new Mobius();
-						m.Isometry( g, 0, -StartingPoint );
-						StartingPointMobius = m;
 
 						List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
 						foreach( int a in active )
@@ -384,6 +381,10 @@
 					edges.Clear();
 					edges.Add( ei );
 				}
+
+				Mobius m = new Mobius();
+				m.Isometry( g, 0, StartingPoint );
+				StartingPointMobius = m;
 
 				UniformEdges = edges.ToArray();
 				foreach( EdgeInfo e in UniformEdges )
@@ -1156,11 +1157,11 @@
 			case 1:
 				return ColorFunc1( settings, v, flips );
 			case 2:
-				return ColorFunc2( settings, v, flips );
+				return ColorFuncIntensity( settings, v, flips );
 			case 3:
 				return ColorFunc1( settings, v, flips, hexagonColoring: true );
 			case 4:
-				return ColorFunc4( settings, v, flips, allFlips.ToArray() );
+				return ColorFuncPicture( settings, v, flips, allFlips.ToArray() );
 			}
 
 			throw new System.ArgumentException( "Unknown Coloring Option." );
@@ -1200,7 +1201,7 @@
 				}
 			}
 
-			System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
+			//System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
 			return false;
 		}
 
@@ -1260,6 +1261,9 @@
 			return settings.ColoringData[idx];
 		}
 
+		/// <summary>
+		/// TODO: custom edge coloring
+		/// </summary>
 		private static Color ColorFunc0( Settings settings, Vector3D v, int[] flips )
 		{
 			int reflections = flips.Sum();
@@ -1327,6 +1331,9 @@
 			return ColorUtil.AvgColorSquare( colors );
 		}
 
+		/// <summary>
+		/// TODO: support snubs
+		/// </summary>
 		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, bool hexagonColoring = false )
 		{
 			int reflections = flips.Sum();
@@ -1374,7 +1381,10 @@
 			return reflections % 2 == 0 ? whitish : darkish;
 		}
 
-		private static Color ColorFunc2( Settings settings, Vector3D v, int[] flips )
+		/// <summary>
+		/// TODO: support snubs
+		/// </summary>
+		private static Color ColorFuncIntensity( Settings settings, Vector3D v, int[] flips )
 		{
 			int reflections = flips.Sum();
 
@@ -1405,7 +1415,7 @@
 			return ColorUtil.AdjustL( c, newVal );
 		}
 
-		private Color ColorFunc4( Settings settings, Vector3D v, int[] flips, int[] allFlips )
+		private Color ColorFuncPicture( Settings settings, Vector3D v, int[] flips, int[] allFlips )
 		{
 			foreach( var edgeInfo in settings.UniformEdges )
 			{

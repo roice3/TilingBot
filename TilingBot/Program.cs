@@ -1,5 +1,6 @@
 ﻿namespace TilingBot
 {
+	using LinqToTwitter;
 	using R3.Core;
 	using R3.Drawing;
 	using R3.Geometry;
@@ -9,6 +10,7 @@
 	using System.IO;
 	using System.Linq;
 	using System.Numerics;
+	using System.Threading.Tasks;
 	using Color = System.Drawing.Color;
 	using Geometry = R3.Geometry.Geometry;
 
@@ -21,24 +23,38 @@
 			try
 			{
 				bool tweet = false;
-				if( args.Length == 1 && args[0] == "-Tweet" )
-					tweet = true;
-
-				if( args.Length == 1 && args[0] == "-TestQueue" )
+				if( args.Length == 1 )
 				{
-					TestCurrentQueue();
-					return;
+					string arg = args[0];
+					if( arg == "-Tweet" )
+					{ 
+						tweet = true;
+					}
+					else if( arg == "-TestQueue" )
+					{
+						TestCurrentQueue();
+						return;
+					}
+					else if( arg == "-Animate" )
+					{
+						Animate();
+						return;
+					}
+					else if( arg == "-Request" )
+					{
+						CheckRequests().Wait();
+						return;
+					}
 				}
 
 				int batch = 1;
 				for( int i = 0; i < batch; i++ )
 					BotWork( tweet );
-
-				//Animate();
 			}
 			catch( Exception e )
 			{
 				Console.WriteLine( "TilingBot malfunction! " + e.Message );
+				throw;
 			}
 		}
 
@@ -60,18 +76,8 @@
 				settings = GenSettings( tweet );
 				Console.WriteLine( Tweet.Format( settings ) + "\n" );
 
-				// Make the tiling.
 				MakeTiling( settings );
-
-				// Archive it.
-				string imagePath = settings.FileName;
-				newPath = Path.Combine( Persistence.WorkingDir, imagePath );
-				File.Move( imagePath, newPath );
-
-				// Save settings for posterity.
-				string settingsPath = FormatFileName() + ".xml";
-				settingsPath = Path.Combine( Persistence.WorkingDir, settingsPath );
-				Persistence.SaveSettings( settings, settingsPath );
+				newPath = ArchiveToWorking( settings );
 			}
 
 			// Tweet it, but only if we aren't testing!
@@ -83,6 +89,19 @@
 
 				// Move to tweeted directory.
 			}
+		}
+
+		static string ArchiveToWorking( Tiler.Settings settings )
+		{
+			string imagePath = settings.FileName;
+			string newPath = Path.Combine( Persistence.WorkingDir, imagePath );
+			File.Move( imagePath, newPath );
+
+			// Save settings for posterity.
+			string settingsPath = FormatFileName() + ".xml";
+			settingsPath = Path.Combine( Persistence.WorkingDir, settingsPath );
+			Persistence.SaveSettings( settings, settingsPath );
+			return newPath;
 		}
 
 		static void TestCurrentQueue()
@@ -121,7 +140,7 @@
 		static void Animate()
 		{
 			Tiler.Settings settings = GenSettings( tweeting: false );
-			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-7-24_23-19-56.xml" ) );
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-8-03_00-47-51.xml") );
 			StandardInputs( settings );
 			settings.Centering = Tiler.Centering.General;	// We will control the Mobius transformation ourself.
 
@@ -135,7 +154,7 @@
 
 			Vector3D[] points = TextureHelper.SubdivideSegmentInGeometry( pStart, pEnd, numFrames, settings.Geometry );
 
-			for( int i=0; i<numFrames; i++ )
+			for( int i=0; i<=numFrames; i++ )
 			{
 				string numString = i.ToString();
 				numString = numString.PadLeft( 3, '0' );
@@ -148,32 +167,59 @@
 				//m.Isometry( settings.Geometry, Math.PI / 4, pCurrent.ToComplex() );
 				//m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
 
-				/* Limit rotation
-				Mobius mRot = new Mobius(), mEdge = new Mobius(), mOff = new Mobius();
-				mRot.Isometry( Geometry.Euclidean, Math.PI, new Complex() );
-				mEdge.Isometry( settings.Geometry, Math.PI / settings.P, settings.Verts[1] );   // Edge-centered
-				mOff.Isometry( Geometry.Euclidean, 0, new Complex( (double)i/numFrames, 0 ) );
-				m = mEdge * HyperbolicModels.UpperInv * mOff * HyperbolicModels.Upper * mRot;
-				*/
-
 				// Rotation
 				double frac = (double)i / numFrames;
 				double xOff = -Spherical2D.s2eNorm( 2 * Geometry2D.GetTriangleQSide( settings.P, settings.Q ) );
-				m = RotAboutPoint( settings, new Vector3D( xOff, 0 ), frac * 2 * Math.PI / settings.P );
+				//m = RotAboutPoint( settings, new Vector3D( xOff, 0 ), frac * 2 * Math.PI / settings.P );
+				m = LimitRot( settings, -Math.PI/4, 2*frac );
 
-				//settings.Mobius = m;
+				settings.Mobius = m;
 				settings.Anim = Util.Smoothed( frac, 1.0 );
 
-
 				Console.WriteLine( Tweet.Format( settings ) + "\n" );
-				MakeTiling( settings );
 				string newPath = Path.Combine( Persistence.AnimDir, settings.FileName );
+				if( File.Exists( newPath ) )
+					continue;
+
+				MakeTiling( settings );
 				File.Delete( newPath );
 				File.Move( settings.FileName, newPath );
 			}
 		}
 
-		static Mobius RotAboutPoint( Tiler.Settings settings, Vector3D p, double rot )
+		static async Task CheckRequests()
+		{
+			Tweet.ReadKeys();
+			TwitterContext twitterCtx = Tweet.TwitterContext();
+
+			// Mentions, but don't include normal replies.
+			var tweets = await
+			  ( from tweet in twitterCtx.Status
+				where tweet.Type == StatusType.Mentions &&
+					tweet.ScreenName == "Tiling Bot" &&
+					tweet.ExcludeReplies == true &&
+					tweet.SinceID == 1024808727394713601
+				select tweet ).ToListAsync();
+
+			tweets.ForEach(
+				mention => Console.WriteLine(
+					"Name: {0}, Tweet[{1}]: {2}\n",
+					mention.User.Name, mention.StatusID, mention.Text ) );
+		}
+
+		/// <summary>
+		/// initialRot is used to take a particular point to infinity. When 0, this point is (0,1) in the ball.
+		/// off is used to do the limit rotation by doing a tranlation in the UHP.
+		/// </summary>
+		static public Mobius LimitRot( Tiler.Settings settings, double initialRot, double off )
+		{
+			Mobius mRot = new Mobius(), mOff = new Mobius();
+			mRot.Isometry( Geometry.Euclidean, initialRot, new Complex() );
+			mOff.Isometry( Geometry.Euclidean, 0, new Complex( off, 0 ) );
+			return HyperbolicModels.UpperInv * mOff * HyperbolicModels.Upper * mRot;
+		}
+
+		static public Mobius RotAboutPoint( Tiler.Settings settings, Vector3D p, double rot )
 		{
 			Mobius m1 = new Mobius(), m2 = new Mobius();
 			m1.Isometry( settings.Geometry, 0, p );

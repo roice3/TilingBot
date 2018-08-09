@@ -348,8 +348,7 @@
 			AccessTokenSecret = keys[3];
 		}
 
-		// https://github.com/JoeMayo/LinqToTwitter/wiki/Tweeting-with-Media
-		public static async Task Send( string status, string imagePath )
+		public static TwitterContext TwitterContext()
 		{
 			var auth = new SingleUserAuthorizer
 			{
@@ -362,11 +361,28 @@
 				}
 			};
 			var twitterCtx = new TwitterContext( auth );
+			return twitterCtx;
+		}
+
+		// https://github.com/JoeMayo/LinqToTwitter/wiki/Tweeting-with-Media
+		public static async Task Send( string status, string imagePath )
+		{
+			TwitterContext twitterCtx = TwitterContext();
 
 			Media media = await twitterCtx.UploadMediaAsync( File.ReadAllBytes( imagePath ), "image/png", "tweet_image" );
 			Status tweet = await twitterCtx.TweetAsync( status, new ulong[] { media.MediaID } );
 			if( tweet != null )
 				Console.WriteLine( $"Tweet sent: {tweet.Text}" );
+		}
+
+		public static async Task Reply( ulong tweetID, string status, string imagePath )
+		{
+			TwitterContext twitterCtx = TwitterContext();
+
+			Media media = await twitterCtx.UploadMediaAsync( File.ReadAllBytes( imagePath ), "image/png", "tweet_image" );
+			Status tweet = await twitterCtx.ReplyAsync( tweetID, status, new ulong[] { media.MediaID } );
+			if( tweet != null )
+				Console.WriteLine( $"Reply sent: {tweet.Text}" );
 		}
 	}
 }
