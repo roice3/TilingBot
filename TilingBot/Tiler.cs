@@ -357,6 +357,35 @@
 						var starting = IterateToStartingPoint( g, Mirrors, Verts, active );
 						Vector3D startingPoint = starting.Item1;
 
+						// Animation.
+						int[] active_;
+						if( false )
+						{
+							Vector3D v1 = Verts[0];
+							Vector3D v2 = Verts[2];
+							double hDist = H3Models.Ball.HDist( v1, v2 );
+							hDist *= this.Anim;
+
+							Mobius m1 = new Mobius();
+							m1.Isometry( this.Geometry, 0, -v1 );
+							Vector3D v2_ = m1.Apply( v2 );
+							double newD = DonHatch.h2eNorm( hDist );
+							v2_.Normalize();
+							v2_ *= newD;
+							startingPoint = m1.Inverse().Apply( v2_ );
+							starting = new Tuple<Vector3D, Vector3D>( startingPoint, new Vector3D( 1.0 - this.Anim, 0, this.Anim ) );
+
+							if( Tolerance.GreaterThan( this.Anim, 0 ) )
+							{
+								if( Tolerance.Equal( this.Anim, 1 ) )
+									active_ = new int[] { 2 };
+								else
+									active_ = new int[] { 0, 2 };
+							}
+							else
+								active_ = active;
+						}
+
 						// Cache it. This is not global at the level of settings, so we may need to adjust in the future.
 						StartingPoint = startingPoint;
 
@@ -1040,6 +1069,11 @@
 					case HyperbolicModel.Square:
 						v = Util.SquareToPoincare( v );
 						break;
+					case HyperbolicModel.InvertedPoincare:
+						double mag = 1.0 / v.Abs();
+						v.Normalize();
+						v *= mag;
+						break;
 					}
 					break;
 				}
@@ -1109,6 +1143,8 @@
 						compare = Math.Abs( v.Y );
 					else if( settings.HyperbolicModel == HyperbolicModel.Square )
 						compare = Math.Max( Math.Abs( v.X ), Math.Abs( v.Y ) );
+					else if( settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
+						compare = 1.0 / v.Abs();
 				}
 
 				if( compare > 1.00133 )
@@ -1141,6 +1177,63 @@
 
 			color = Color.White;
 			return false;
+		}
+
+		public double Minkowski(Vector3D p1, Vector3D p2)
+		{
+			return - Math.Pow( p1.X - p2.X, 2 ) + Math.Pow( p1.Y - p2.Y, 2 );
+		}
+
+		private Color CalcColorMinkowski( Settings settings, Vector3D v )
+		{
+			double spacing = 0.5;
+			v /= spacing;
+			Vector3D vOrig = v;
+
+			Vector3D e1 = new Vector3D( 1, 0 );
+			Vector3D e2 = e1;
+			e2.RotateXY( Math.PI / 3 );
+
+			// Transform
+			{
+				double x = v.X, y = v.Y;
+				double alpha = Euclidean2D.AngleToClock( e1 + 2 * e2, e1 );
+				double B = Math.Tan( alpha );
+				double eta = m_settings.Anim * DonHatch.atanh( B );
+				v.X = x * Math.Cosh( eta ) - y * Math.Sinh( eta );
+				v.Y = y * Math.Cosh( eta ) - x * Math.Sinh( eta );
+			}
+
+			int fx = (int)Math.Floor( ( v.X - v.Y * e2.X / e2.Y ) / e1.X );
+			int fy = (int)Math.Floor( v.Y / e2.Y );
+
+			double s2, d;
+			int num = 3;
+			for( int i = -num; i <= num; i++ )
+				for( int j = -num; j <= num; j++ )
+				{
+					Vector3D compare = new Vector3D();
+					compare = e1 * ( fx + i ) + e2 * ( fy + j );
+
+					s2 = Minkowski( v, compare );
+					d = Math.Sqrt( Math.Abs( s2 ) );
+					//double intensity = Math.Exp( -100 * d * d );
+
+					// Too close to the light ray causes issues.
+					double ed = v.Dist( compare );
+
+					if( ed < 0.9 )
+						if( d < settings.VertexWidth )
+							return Color.Black;
+				}
+
+			s2 = Minkowski( vOrig, new Vector3D() );
+			d = Math.Sqrt( Math.Abs( s2 ) );
+			double dr = Math.Round( d, 0 );
+			if( Math.Abs( d - dr ) < 0.075 )
+				return Color.DeepSkyBlue;
+
+			return Color.White;
 		}
 
 		private Color CalcColor( Settings settings, Vector3D v )
@@ -1201,7 +1294,7 @@
 				}
 			}
 
-			//System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
+			System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
 			return false;
 		}
 
@@ -1209,6 +1302,9 @@
 
 		private bool ReflectAcrossMirror( CircleNE mirror, ref Vector3D v )
 		{
+			if( mirror.IsPointOn( v ) )
+				return true;
+
 			bool outsideFacet = mirror.IsPointInsideNE( v );
 			if( outsideFacet )
 			{

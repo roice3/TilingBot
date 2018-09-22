@@ -264,7 +264,7 @@
 					switch( settings.HyperbolicModel )
 					{
 					case HyperbolicModel.Poincare:
-						model = "Poincaré ball";
+						model = "Poincaré disk";
 						break;
 					case HyperbolicModel.Klein:
 						model = "Klein";
@@ -280,6 +280,9 @@
 						break;
 					case HyperbolicModel.Square:
 						model = "conformal square";
+						break;
+					case HyperbolicModel.InvertedPoincare:
+						model = "inverted Poincaré disk";
 						break;
 					}
 					break;

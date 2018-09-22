@@ -140,71 +140,79 @@
 		static void Animate()
 		{
 			Tiler.Settings settings = GenSettings( tweeting: false );
-			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-8-03_00-47-51.xml") );
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-9-22_12-28-47.xml" ) );
 			StandardInputs( settings );
-			settings.Centering = Tiler.Centering.General;	// We will control the Mobius transformation ourself.
+			settings.Centering = Tiler.Centering.General;   // We will control the Mobius transformation ourself.
 
-			int numFrames = Test.IsTesting ? 6 : 90;
-			Vector3D pStart = settings.Verts[2];
-			double dist = Spherical2D.s2eNorm( Spherical2D.e2sNorm( settings.Verts[1].Abs() ) * 2 ) * Math.Sqrt( 2 ) / 2;
-			Vector3D pEnd = new Vector3D( dist, dist );
+			int numFrames = Test.IsTesting ? 10 : 120;
+			//numFrames = 6;
 
-			//Vector3D pEnd = pStart;
-			//pEnd.RotateXY( 2 * Math.PI / settings.P );
+			Vector3D pStart = new Vector3D();
+			double dist = Geometry2D.GetTriangleQSide( settings.P, settings.Q );
+			Vector3D pEnd = new Vector3D( DonHatch.h2eNorm( 2 * dist ), 0 );
+			pEnd.RotateXY( Math.PI / settings.P );
 
 			Vector3D[] points = TextureHelper.SubdivideSegmentInGeometry( pStart, pEnd, numFrames, settings.Geometry );
 
-			for( int i=0; i<=numFrames; i++ )
+			for( int i=0; i<numFrames; i++ )
 			{
 				string numString = i.ToString();
 				numString = numString.PadLeft( 3, '0' );
 				settings.FileName = "frame" + numString + ".png";
+				double frac = (double)i / numFrames;
 
 				// Setup the Mobius.
 				Vector3D pCurrent = points[i];
-				Mobius m = new Mobius();
+				Mobius m = Mobius.Identity(), mInitOff = Mobius.Identity(), mInitRot = Mobius.Identity();
+
+				//mInitOff = OffsetMobius( settings );
+				//mInitRot = Mobius.CreateFromIsometry( Geometry.Euclidean, 5 * 2 * frac * Math.PI / settings.P, new Complex() );
 
 				//m.Isometry( settings.Geometry, Math.PI / 4, pCurrent.ToComplex() );
-				//m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
+				m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
 
 				// Rotation
-				double frac = (double)i / numFrames;
-				double xOff = -Spherical2D.s2eNorm( 2 * Geometry2D.GetTriangleQSide( settings.P, settings.Q ) );
-				//m = RotAboutPoint( settings, new Vector3D( xOff, 0 ), frac * 2 * Math.PI / settings.P );
-				m = LimitRot( settings, -Math.PI/4, 2*frac );
+				double xOff = OffsetInModel( settings, 0, 0, 1 );
+				//m = RotAboutPoint( settings, new Vector3D( xOff, 0 ), frac * 2 * Math.PI / settings.Q );
+				//m = LimitRot( settings, -Math.PI/4, 2*frac );
 
-				settings.Mobius = m;
+				settings.Mobius = m * mInitOff * mInitRot;
 				settings.Anim = Util.Smoothed( frac, 1.0 );
 
 				Console.WriteLine( Tweet.Format( settings ) + "\n" );
 				string newPath = Path.Combine( Persistence.AnimDir, settings.FileName );
-				if( File.Exists( newPath ) )
-					continue;
-
+				//if( File.Exists( newPath ) )
+					//continue;
+				
+				settings.Init();	// Need to do this when animating where edges need recalc.
 				MakeTiling( settings );
 				File.Delete( newPath );
 				File.Move( settings.FileName, newPath );
 			}
 		}
 
-		static async Task CheckRequests()
+		static public double OffsetInModel( Tiler.Settings settings, double p = 0, double q = 0, double r = 1 )
 		{
-			Tweet.ReadKeys();
-			TwitterContext twitterCtx = Tweet.TwitterContext();
+			double off =
+				p * Geometry2D.GetTrianglePSide( settings.P, settings.Q ) +
+				q * Geometry2D.GetTriangleQSide( settings.P, settings.Q ) +
+				r * Geometry2D.GetTriangleHypotenuse( settings.P, settings.Q );
+			switch( settings.Geometry )
+			{
+				case Geometry.Spherical:
+					off = Spherical2D.s2eNorm( off );
+					break;
+				case Geometry.Hyperbolic:
+					off = DonHatch.h2eNorm( off );
+					break;
+			}
+			return off;
+		}
 
-			// Mentions, but don't include normal replies.
-			var tweets = await
-			  ( from tweet in twitterCtx.Status
-				where tweet.Type == StatusType.Mentions &&
-					tweet.ScreenName == "Tiling Bot" &&
-					tweet.ExcludeReplies == true &&
-					tweet.SinceID == 1024808727394713601
-				select tweet ).ToListAsync();
-
-			tweets.ForEach(
-				mention => Console.WriteLine(
-					"Name: {0}, Tweet[{1}]: {2}\n",
-					mention.User.Name, mention.StatusID, mention.Text ) );
+		static public Mobius OffsetMobius( Tiler.Settings settings, double p = 0, double q = 0, double r = 1 )
+		{
+			double off = OffsetInModel( settings, p, q, r );
+			return Mobius.CreateFromIsometry( settings.Geometry, 0, new Complex( off, 0 ) );
 		}
 
 		/// <summary>
@@ -225,6 +233,26 @@
 			m1.Isometry( settings.Geometry, 0, p );
 			m2.Isometry( settings.Geometry, rot, new Complex() );
 			return m1 * m2 * m1.Inverse();
+		}
+
+		static async Task CheckRequests()
+		{
+			Tweet.ReadKeys();
+			TwitterContext twitterCtx = Tweet.TwitterContext();
+
+			// Mentions, but don't include normal replies.
+			var tweets = await
+			  ( from tweet in twitterCtx.Status
+				where tweet.Type == StatusType.Mentions &&
+					tweet.ScreenName == "Tiling Bot" &&
+					tweet.ExcludeReplies == true &&
+					tweet.SinceID == 1024808727394713601
+				select tweet ).ToListAsync();
+
+			tweets.ForEach(
+				mention => Console.WriteLine(
+					"Name: {0}, Tweet[{1}]: {2}\n",
+					mention.User.Name, mention.StatusID, mention.Text ) );
 		}
 
 		static string FormatFileName()
@@ -463,13 +491,16 @@
 				settings.Bounds = settings.EuclideanModel == EuclideanModel.Isometric ? 2 : diskBounds;
 				break;
 			case Geometry.Hyperbolic:
-				settings.Bounds = settings.HyperbolicModel == HyperbolicModel.Orthographic ? 5 : diskBounds;
+				settings.Bounds =  diskBounds;
 				if( settings.HyperbolicModel == HyperbolicModel.Band )
 				{
 					double factor = 1.5;
 					settings.Height = (int)(settings.Height / factor);
 					settings.Width = (int)(settings.Width * factor);
 				}
+				if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
+					settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
+					settings.Bounds = 5;
 				break;
 			}
 
