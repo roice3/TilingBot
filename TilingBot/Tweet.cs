@@ -250,7 +250,8 @@
 					// These next two aren't well known and I should come up with better names.
 					case EuclideanModel.Disk:
 						prefix = "a ";
-						model = "disk";
+						model = "fisheye";
+						postfix = " view";
 						break;
 					case EuclideanModel.UpperHalfPlane:
 						prefix = "an ";
