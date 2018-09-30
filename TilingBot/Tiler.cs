@@ -358,7 +358,7 @@
 						Vector3D startingPoint = starting.Item1;
 
 						// Animation.
-						int[] active_;
+						int[] active_ = active;
 						if( false )
 						{
 							Vector3D v1 = Verts[0];
@@ -382,15 +382,28 @@
 								else
 									active_ = new int[] { 0, 2 };
 							}
-							else
-								active_ = active;
+						}
+						if( false )
+						{
+							// Get the edge length. Assumes omnitruncation.
+							Vector3D reflected = Mirrors[0].ReflectPoint( startingPoint );
+
+							double hDist = H3Models.Ball.HDist( startingPoint, reflected ) / 2;
+
+							Vector3D cen;
+							double d;
+							H3Models.Ball.DupinCyclideSphere( startingPoint, DonHatch.h2eNorm( hDist ), g, out cen, out d );
+
+							double a = Math.PI * 2 * Anim;
+							startingPoint = cen + new Vector3D( d * Math.Cos( a ), d * Math.Sin( a ) );
+							starting = new Tuple<Vector3D, Vector3D>( startingPoint, new Vector3D( 1.0 - this.Anim, 0, this.Anim ) );
 						}
 
 						// Cache it. This is not global at the level of settings, so we may need to adjust in the future.
 						StartingPoint = startingPoint;
 
 						List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
-						foreach( int a in active )
+						foreach( int a in active_ )
 						{
 							Vector3D reflected = Mirrors[a].ReflectPoint( startingPoint );
 							startingEdges.Add( new H3.Cell.Edge( startingPoint, reflected, order: false ) );    // CAN'T ORDER HERE!

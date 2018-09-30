@@ -140,11 +140,12 @@
 		static void Animate()
 		{
 			Tiler.Settings settings = GenSettings( tweeting: false );
-			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-9-22_12-28-47.xml" ) );
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-9-23_22-10-43.xml" ) );
 			StandardInputs( settings );
 			settings.Centering = Tiler.Centering.General;   // We will control the Mobius transformation ourself.
+			settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex3;
 
-			int numFrames = Test.IsTesting ? 10 : 120;
+			int numFrames = Test.IsTesting ? 10 : 210;
 			//numFrames = 6;
 
 			Vector3D pStart = new Vector3D();
@@ -169,7 +170,7 @@
 				//mInitRot = Mobius.CreateFromIsometry( Geometry.Euclidean, 5 * 2 * frac * Math.PI / settings.P, new Complex() );
 
 				//m.Isometry( settings.Geometry, Math.PI / 4, pCurrent.ToComplex() );
-				m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
+				//m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
 
 				// Rotation
 				double xOff = OffsetInModel( settings, 0, 0, 1 );
@@ -177,7 +178,7 @@
 				//m = LimitRot( settings, -Math.PI/4, 2*frac );
 
 				settings.Mobius = m * mInitOff * mInitRot;
-				settings.Anim = Util.Smoothed( frac, 1.0 );
+				settings.Anim = frac;// Util.Smoothed( frac, 1.0 );
 
 				Console.WriteLine( Tweet.Format( settings ) + "\n" );
 				string newPath = Path.Combine( Persistence.AnimDir, settings.FileName );
