@@ -46,7 +46,7 @@
 			s{p,q} = htr{p,qP = h{p,q}_111 (snub)
 			*/
 
-			string centeringString = CenteringString( settings );
+			string centeringString = string.Empty; //CenteringString( settings );
 			string modelString = ModelString( settings );
 			string additionalInfo = string.Empty;
 			string link = string.Empty;
@@ -68,7 +68,10 @@
 			{
 				additionalInfo = Capitalize( ShortDesc( settings ) ) + ".";
 			}
-																		
+
+			// Consider adding links for projections as well.
+			// https://en.wikipedia.org/wiki/Sinusoidal_projection
+
 			if( settings.IsSnub && !settings.Dual )
 				link = @"https://en.wikipedia.org/wiki/Snub_(geometry)";
 			if( !string.IsNullOrEmpty( link ) )
@@ -199,7 +202,7 @@
 		{
 			string model = string.Empty;
 			string prefix = "the ";
-			string postfix = " model";
+			string postfix = " projection";
 			switch( settings.Geometry )
 			{
 			case Geometry.Spherical:
@@ -209,7 +212,6 @@
 					case SphericalModel.Sterographic:
 						prefix = string.Empty;
 						model = "stereographic";
-						postfix = " projection";
 						break;
 					case SphericalModel.Gnomonic:
 						model = "gnomonic";
@@ -222,17 +224,17 @@
 						break;
 					case SphericalModel.Equirectangular:
 						model = "equirectangular";
-						postfix = " projection";
 						break;
 					case SphericalModel.Mercator:
 						model = "Mercator";
-						postfix = " projection";
 						break;
 					case SphericalModel.Orthographic:
 						model = "orthographic";
-						postfix = " projection";
 						break;
-					}
+					case SphericalModel.Sinusoidal:
+						model = "sinusoidal";
+						break;
+					}		
 					break;
 				}
 			case Geometry.Euclidean:
@@ -241,6 +243,7 @@
 					{
 					case EuclideanModel.Isometric:
 						model = "plane";
+						postfix = " model";
 						break;
 					case EuclideanModel.Conformal:
 						prefix = "a ";
@@ -256,6 +259,7 @@
 					case EuclideanModel.UpperHalfPlane:
 						prefix = "an ";
 						model = "upper half plane";
+						postfix = " model";
 						break;
 					}
 					break;
@@ -266,15 +270,19 @@
 					{
 					case HyperbolicModel.Poincare:
 						model = "Poincaré disk";
+						postfix = " model";
 						break;
 					case HyperbolicModel.Klein:
 						model = "Klein";
+						postfix = " model";
 						break;
 					case HyperbolicModel.UpperHalfPlane:
 						model = "upper half plane";
+						postfix = " model";
 						break;
 					case HyperbolicModel.Band:
 						model = "band";
+						postfix = " model";
 						break;
 					case HyperbolicModel.Orthographic:
 						model = "orthographic";
