@@ -113,7 +113,7 @@
 			foreach( FileInfo file in di.GetFiles() )
 				file.Delete();
 
-			string workingDir = @"D:\Dropbox\TilingBot\working\";
+			string workingDir = @"D:\TilingBot\working\";
 			Persistence.WorkingDir = workingDir;
 			string[] queue = File.ReadAllLines( Persistence.QueueFile );
 			List<string> tweetStrings = new List<string>();
@@ -436,7 +436,7 @@
 			return settings;
 		}
 
-		private static void MakeTiling( Tiler.Settings settings )
+		internal static void MakeTiling( Tiler.Settings settings )
 		{
 			Tiler tiler = new Tiler();
 			tiler.GenImage( settings );

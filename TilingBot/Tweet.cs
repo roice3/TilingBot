@@ -50,7 +50,11 @@
 			string modelString = ModelString( settings );
 			string additionalInfo = string.Empty;
 			string link = string.Empty;
-			if( settings.IsGeodesicDomeAnalogue )
+			if( settings.DualCompound )
+			{
+				additionalInfo = DualCompoundString( settings );
+			}
+			else if( settings.IsGeodesicDomeAnalogue )
 			{
 				additionalInfo = GeodesicString( settings );
 				link = @"https://en.wikipedia.org/wiki/Geodesic_polyhedron";
@@ -96,6 +100,12 @@
 
 			string uniformDesc = UniformDesc( settings, false );
 			return string.Format( "{0} {{{1},{2}}}", uniformDesc, p, q );
+		}
+
+		private static string DualCompoundString( Tiler.Settings settings )
+		{
+			string symmetry = SymmetryDesc( settings );
+			return string.Format( "Dual compound with {0}.", symmetry );
 		}
 
 		private static string GeodesicString( Tiler.Settings settings )

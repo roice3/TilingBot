@@ -163,6 +163,8 @@
 					{
 						if( Active[0] == 0 )
 							Active[0] = 2;
+						else
+							Active[0] = 0;
 					}
 					/*EdgeInfo[] dualEdges = CalcEdges();
 					List<H3.Cell.Edge> combined = new List<H3.Cell.Edge>();
