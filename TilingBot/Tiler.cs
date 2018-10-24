@@ -60,6 +60,9 @@
 			public bool Dual { get; set; }
 
 			[DataMember]
+			public bool DualCompound { get; set; }
+
+			[DataMember]
 			public bool Snub { get; set; }
 
 			/// <summary>
@@ -150,7 +153,29 @@
 			public void Init()
 			{
 				CalcMirrors();
-				CalcEdges();
+
+				List<EdgeInfo> ei = new List<EdgeInfo>();
+				ei.AddRange( CalcEdges() );
+				if( DualCompound )
+				{
+					Dual = !Dual;
+					if( IsRegular )
+					{
+						if( Active[0] == 0 )
+							Active[0] = 2;
+					}
+					/*EdgeInfo[] dualEdges = CalcEdges();
+					List<H3.Cell.Edge> combined = new List<H3.Cell.Edge>();
+					combined.AddRange( edges.First().Edges );
+					combined.AddRange( dualEdges.First().Edges );
+					edges.First().Edges = combined.ToArray();*/
+					ei.AddRange( CalcEdges() );
+				}
+
+				UniformEdges = ei.ToArray();
+				foreach( EdgeInfo e in UniformEdges )
+					e.PreCalc( this );
+
 				CalcCentering();
 			}
 
@@ -323,7 +348,7 @@
 				}
 			}
 
-			private void CalcEdges()
+			private EdgeInfo[] CalcEdges()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
 
@@ -359,45 +384,8 @@
 
 						// Animation.
 						int[] active_ = active;
-						if( false )
-						{
-							Vector3D v1 = Verts[0];
-							Vector3D v2 = Verts[2];
-							double hDist = H3Models.Ball.HDist( v1, v2 );
-							hDist *= this.Anim;
-
-							Mobius m1 = new Mobius();
-							m1.Isometry( this.Geometry, 0, -v1 );
-							Vector3D v2_ = m1.Apply( v2 );
-							double newD = DonHatch.h2eNorm( hDist );
-							v2_.Normalize();
-							v2_ *= newD;
-							startingPoint = m1.Inverse().Apply( v2_ );
-							starting = new Tuple<Vector3D, Vector3D>( startingPoint, new Vector3D( 1.0 - this.Anim, 0, this.Anim ) );
-
-							if( Tolerance.GreaterThan( this.Anim, 0 ) )
-							{
-								if( Tolerance.Equal( this.Anim, 1 ) )
-									active_ = new int[] { 2 };
-								else
-									active_ = new int[] { 0, 2 };
-							}
-						}
-						if( false )
-						{
-							// Get the edge length. Assumes omnitruncation.
-							Vector3D reflected = Mirrors[0].ReflectPoint( startingPoint );
-
-							double hDist = H3Models.Ball.HDist( startingPoint, reflected ) / 2;
-
-							Vector3D cen;
-							double d;
-							H3Models.Ball.DupinCyclideSphere( startingPoint, DonHatch.h2eNorm( hDist ), g, out cen, out d );
-
-							double a = Math.PI * 2 * Anim;
-							startingPoint = cen + new Vector3D( d * Math.Cos( a ), d * Math.Sin( a ) );
-							starting = new Tuple<Vector3D, Vector3D>( startingPoint, new Vector3D( 1.0 - this.Anim, 0, this.Anim ) );
-						}
+						AnimateGeneratingVertex( g, ref startingPoint, ref active_ );
+						//starting = new Tuple<Vector3D, Vector3D>( startingPoint, new Vector3D( 1.0 - this.Anim, 0, this.Anim ) );
 
 						// Cache it. This is not global at the level of settings, so we may need to adjust in the future.
 						StartingPoint = startingPoint;
@@ -428,9 +416,48 @@
 				m.Isometry( g, 0, StartingPoint );
 				StartingPointMobius = m;
 
-				UniformEdges = edges.ToArray();
-				foreach( EdgeInfo e in UniformEdges )
-					e.PreCalc( this );
+				return edges.ToArray();
+			}
+
+			private void AnimateGeneratingVertex( Geometry g, ref Vector3D startingPoint, ref int[] active_ )
+			{
+				if( false )
+				{
+					Vector3D v1 = Verts[0];
+					Vector3D v2 = Verts[2];
+					double hDist = H3Models.Ball.HDist( v1, v2 );
+					hDist *= this.Anim;
+
+					Mobius m1 = new Mobius();
+					m1.Isometry( this.Geometry, 0, -v1 );
+					Vector3D v2_ = m1.Apply( v2 );
+					double newD = DonHatch.h2eNorm( hDist );
+					v2_.Normalize();
+					v2_ *= newD;
+					startingPoint = m1.Inverse().Apply( v2_ );
+
+					if( Tolerance.GreaterThan( this.Anim, 0 ) )
+					{
+						if( Tolerance.Equal( this.Anim, 1 ) )
+							active_ = new int[] { 2 };
+						else
+							active_ = new int[] { 0, 2 };
+					}
+				}
+				if( false )
+				{
+					// Get the edge length. Assumes omnitruncation.
+					Vector3D reflected = Mirrors[0].ReflectPoint( startingPoint );
+
+					double hDist = H3Models.Ball.HDist( startingPoint, reflected ) / 2;
+
+					Vector3D cen;
+					double d;
+					H3Models.Ball.DupinCyclideSphere( startingPoint, DonHatch.h2eNorm( hDist ), g, out cen, out d );
+
+					double a = Math.PI * 2 * Anim;
+					startingPoint = cen + new Vector3D( d * Math.Cos( a ), d * Math.Sin( a ) );
+				}
 			}
 
 			private void HandleGeodesicOrGoldberg( List<EdgeInfo> edges, Vector3D color )
@@ -567,13 +594,13 @@
 				v *= 0.999;
 			}
 
-			private void CalcCentering()
+			public Mobius CenteringMobius()
 			{
 				Mobius m = new Mobius();
 				switch( Centering )
 				{
 				case Centering.General:
-					return;
+					return Mobius;
 				case Centering.Fundamental_Triangle_Vertex1:
 					m.Isometry( Geometry, 0, Verts[0] );
 					break;
@@ -587,7 +614,12 @@
 					m = StartingPointMobius;
 					break;
 				}
-				Mobius = m;
+				return m;
+			}
+
+			private void CalcCentering()
+			{
+				Mobius = CenteringMobius();
 			}
 
 			public Tuple<Vector3D, Vector3D> IterateToStartingPoint( Geometry g, CircleNE[] mirrors, Vector3D[] verts, int[] activeMirrors )
@@ -1029,6 +1061,9 @@
 					case SphericalModel.Orthographic:
 						v = SphericalModels.OrthographicToStereo( v );
 						break;
+					case SphericalModel.Sinusoidal:
+						v = SphericalModels.SinusoidalToStereo( v );
+						break;
 					}
 					break;
 				}
@@ -1044,6 +1079,12 @@
 						break;
 					case EuclideanModel.UpperHalfPlane:
 						v = EuclideanModels.UpperHalfPlaneToIsometric( v );
+						break;
+					case EuclideanModel.Spiral:
+						v = EuclideanModels.SpiralToIsometric( v );
+						break;
+					case EuclideanModel.Loxodromic:
+						v = EuclideanModels.LoxodromicToIsometric( v );
 						break;
 					}
 					break;
@@ -1071,10 +1112,28 @@
 					case HyperbolicModel.Band:
 						{
 							v.X *= Math.Pow( 1.5, 2 );  // Magic number here must match height/width value in Program.cs.
-							Complex vc = v.ToComplex();
-							Complex result = (Complex.Exp( Math.PI * vc / 2 ) - 1) / (Complex.Exp( Math.PI * vc / 2 ) + 1);
-							v = Vector3D.FromComplex( result );
+							v = HyperbolicModels.BandToPoincare( v );
 							break;
+
+							/*
+							// Animating Band -> Poincare.
+							Complex w = vc;
+							if( Tolerance.Zero( this.m_settings.Anim ) )
+							{
+								// Do nothing.
+							}
+							else if( Tolerance.Equal( this.m_settings.Anim, 1.0 ) )
+							{ 
+								w = bandToDisk( vc );
+							}
+							else
+							{
+								double factor = 1.0 / ( Math.Pow( this.m_settings.Anim, 0.5 ) );
+								double post = bandToDisk( new Complex( 0, 1.0 / factor ) ).Magnitude;
+								vc /= factor;
+								w = bandToDisk( vc );
+								w /= post;
+							} */
 						}
 					case HyperbolicModel.Orthographic:
 						v = HyperbolicModels.OrthoToPoincare( v );
@@ -1086,6 +1145,9 @@
 						double mag = 1.0 / v.Abs();
 						v.Normalize();
 						v *= mag;
+						break;
+					case HyperbolicModel.Joukowsky:
+						v = HyperbolicModels.JoukowskyToPoincare( v );
 						break;
 					}
 					break;
@@ -1181,6 +1243,15 @@
 					settings.SphericalModel == SphericalModel.Orthographic )
 				{
 					if( v.Abs() > 1 )
+					{
+						color = bgColor;
+						return true;
+					}
+				}
+
+				if( settings.SphericalModel == SphericalModel.Sinusoidal )
+				{
+					if( Math.Cos( v.Y * Math.PI / 2 ) < Math.Abs( v.X ) )
 					{
 						color = bgColor;
 						return true;
@@ -1488,6 +1559,7 @@
 				return whitish;
 
 			return reflections % 2 == 0 ? whitish : darkish;
+			// return flips[2] % 2 == 0 ? Color.Black : Color.White;	// Checkerboard
 		}
 
 		/// <summary>

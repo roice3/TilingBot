@@ -249,7 +249,6 @@
 						prefix = "a ";
 						model = "conformal";
 						break;
-
 					// These next two aren't well known and I should come up with better names.
 					case EuclideanModel.Disk:
 						prefix = "a ";
@@ -259,7 +258,14 @@
 					case EuclideanModel.UpperHalfPlane:
 						prefix = "an ";
 						model = "upper half plane";
-						postfix = " model";
+						break;
+					case EuclideanModel.Spiral:
+						prefix = "a ";
+						model = "spiral";
+						break;
+					case EuclideanModel.Loxodromic:
+						prefix = "a ";
+						model = "loxodromic";
 						break;
 					}
 					break;
@@ -292,6 +298,9 @@
 						break;
 					case HyperbolicModel.InvertedPoincare:
 						model = "inverted Poincaré disk";
+						break;
+					case HyperbolicModel.Joukowsky:
+						model = "Joukowsky";
 						break;
 					}
 					break;
