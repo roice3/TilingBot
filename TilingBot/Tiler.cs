@@ -108,9 +108,11 @@
 			[DataMember]
 			public int[] ColoringData { get; set; }
 
+			[DataMember]
+			public double Bounds { get; set; }
+
 			public int Width { get; set; }
 			public int Height { get; set; }
-			public double Bounds { get; set; }
 			public CircleNE[] Mirrors { get; set; }   // in conformal model
 			public Vector3D[] Verts { get; set; }
 			public string FileName { get; set; }
@@ -425,6 +427,35 @@
 			{
 				if( false )
 				{
+					// {i,i}
+					Vector3D v1 = new Vector3D( -1, 0 );
+					Vector3D v2 = v1 + new Vector3D( 2 * this.Anim, 0 );
+					startingPoint = v2;
+					active_ = new int[] { 0, 2 };
+				}
+
+				if( false )
+				{
+					Vector3D v0 = Verts[0];
+					Vector3D v1 = Verts[1];
+					Vector3D v2 = Verts[2];
+					double hDist1 = H3Models.Ball.HDist( v0, v1 );
+					double hDist2 = H3Models.Ball.HDist( v1, v2 );
+					double hDist3 = H3Models.Ball.HDist( v2, v0 );
+					double hDist = ( hDist1 + hDist2 + hDist3 );
+					hDist *= this.Anim;
+
+					startingPoint = new Vector3D( DonHatch.h2eNorm( hDist ), 0 );
+
+					int[] flips = new int[4];
+					List<int> allFlips = new List<int>();
+					ReflectToFundamental( this, ref startingPoint, ref flips, allFlips );
+
+					active_ = new int[] { 0, 1, 2 };
+				}
+
+				if( false )
+				{
 					Vector3D v1 = Verts[0];
 					Vector3D v2 = Verts[2];
 					double hDist = H3Models.Ball.HDist( v1, v2 );
@@ -699,7 +730,7 @@
 				// For each iteration, we'll shrink this search offset.
 				// NOTE: I'm not sure that the starting offset and decrease factor I'm using
 				// guarantee convergence, but it seems to be working pretty well (even when varying these parameters).
-				double factor = 1.3;
+				double factor = 1.2;
 				double searchOffset = bary[activeMirrors[0]] / factor;
 
 				double min = double.MaxValue;
@@ -795,8 +826,8 @@
 			/// </summary>
 			public int ColorIndexForPoint( Vector3D test )
 			{
-				EdgeInfo ei = UniformEdges[0];
-				var edges = UniformEdges[0].Edges;
+				EdgeInfo ei = UniformEdges.Last();
+				var edges = ei.Edges;
 
 				// We need to go through the edges in CCW order.
 				// ZZZ - Performance: should be moved to an outer loop.
@@ -1066,6 +1097,9 @@
 					case SphericalModel.Sinusoidal:
 						v = SphericalModels.SinusoidalToStereo( v );
 						break;
+					case SphericalModel.PierceQuincuncial:
+						v = Util.PierceToStereo( v );
+						break;
 					}
 					break;
 				}
@@ -1083,10 +1117,10 @@
 						v = EuclideanModels.UpperHalfPlaneToIsometric( v );
 						break;
 					case EuclideanModel.Spiral:
-						v = EuclideanModels.SpiralToIsometric( v );
+						v = EuclideanModels.SpiralToIsometric( v, m_settings.P, 7, 3 );
 						break;
 					case EuclideanModel.Loxodromic:
-						v = EuclideanModels.LoxodromicToIsometric( v );
+						v = EuclideanModels.LoxodromicToIsometric( v, m_settings.P, 7, 3 );
 						break;
 					}
 					break;
@@ -1149,12 +1183,20 @@
 						v *= mag;
 						break;
 					case HyperbolicModel.Joukowsky:
-						v = HyperbolicModels.JoukowskyToPoincare( v );
+								double off = 0.25;
+								double amt = m_settings.Anim * 2 * Math.PI;
+								Vector3D cen = new Vector3D( Math.Cos( amt ) * off, Math.Sin( amt ) * off );
+						v = HyperbolicModels.JoukowskyToPoincare( v, cen );
 						break;
 					}
 					break;
 				}
 			}
+
+			// Branched cover?
+			/*Complex vc = v.ToComplex();
+			vc = vc * vc * vc;
+			v = Vector3D.FromComplex( vc );*/
 
 			// Apply the centering one.
 			Mobius m = m_settings.Mobius;
@@ -1182,11 +1224,11 @@
 		{
 			if( settings.Geometry == Geometry.Euclidean )
 			{
-				if( settings.EuclideanModel == EuclideanModel.Isometric ||
-					settings.EuclideanModel == EuclideanModel.Conformal )
-					return false;
-				else
+				if( settings.EuclideanModel == EuclideanModel.Disk ||
+					settings.EuclideanModel == EuclideanModel.UpperHalfPlane )
 					return true;
+				else
+					return false;
 			}
 
 			if( settings.Geometry == Geometry.Spherical )
@@ -1194,7 +1236,8 @@
 
 			if( settings.Geometry == Geometry.Hyperbolic )
 			{ 
-				if( settings.HyperbolicModel == HyperbolicModel.Orthographic )
+				if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
+					settings.HyperbolicModel == HyperbolicModel.Joukowsky )
 					return false;
 				else
 					return true;
@@ -1234,6 +1277,7 @@
 				if( limitSet )
 				{
 					color = Color.Black;
+					//color = bgColor;
 					return true;
 				}
 			}
@@ -1349,7 +1393,7 @@
 		/// <summary>
 		/// Somewhat based on http://commons.wikimedia.org/wiki/User:Tamfang/programs
 		/// </summary>
-		private bool ReflectToFundamental( Settings settings, ref Vector3D v, ref int[] flips, List<int> allFlips )
+		internal static bool ReflectToFundamental( Settings settings, ref Vector3D v, ref int[] flips, List<int> allFlips )
 		{
 			Vector3D original = v;
 
@@ -1384,9 +1428,9 @@
 			return false;
 		}
 
-		private int m_maxIterations = 4000;
+		private static int m_maxIterations = 4000;
 
-		private bool ReflectAcrossMirror( CircleNE mirror, ref Vector3D v )
+		private static bool ReflectAcrossMirror( CircleNE mirror, ref Vector3D v )
 		{
 			if( mirror.IsPointOn( v ) )
 				return true;
@@ -1401,7 +1445,7 @@
 			return true;
 		}
 
-		private bool ReflectAcrossMirrors( CircleNE[] mirrors, ref Vector3D v, ref List<int> allFlips, ref int[] flips, ref int iterationCount )
+		private static bool ReflectAcrossMirrors( CircleNE[] mirrors, ref Vector3D v, ref List<int> allFlips, ref int[] flips, ref int iterationCount )
 		{
 			int clean = 0;
 			while( true && iterationCount < m_maxIterations )
@@ -1495,7 +1539,7 @@
 			}
 
 			int idx;
-			if( settings.IsSnub || settings.IsGoldberg )
+			if( settings.IsSnub || settings.IsGoldberg || settings.IsGeodesicDomeAnalogue )
 				idx = 0;
 			else
 				idx = settings.ColorIndexForPoint( v );

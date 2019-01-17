@@ -2,6 +2,7 @@
 {
 	using Meta.Numerics.Functions;
 	using R3.Geometry;
+	using R3.Math;
 	using System.Linq;
 	using System.Numerics;
 	using Math = System.Math;
@@ -129,7 +130,7 @@
 
 		public static double Smoothed( double input, double max )
 		{
-			return (max / 2.0) * (-Math.Cos( Math.PI * input / max ) + 1);
+			return (max / 2.0) * (-Math.Cos( Math.PI * input ) + 1);
 		}
 
 		/// <summary>
@@ -168,6 +169,22 @@
 
 			Complex result = a * JacobiCn( K_e * ( b * z - 1 ), 1 / Math.Sqrt( 2 ) );
 			return Vector3D.FromComplex( result );
+		}
+
+		public static Vector3D PierceToStereo( Vector3D p )
+		{
+			return SquareToPoincare( p );
+		}
+
+		/// <summary>
+		/// https://www.physicsforums.com/threads/conformal-map-for-regular-polygon-in-circle.89759/
+		/// https://math.stackexchange.com/questions/1528270/numerical-libraries-and-special-function-of-complex-parameters/1528299#1528299
+		/// </summary>
+		public static Complex PolygonToPoincare( Vector3D p )
+		{
+			//z( 1 - z ^ m ) ^ ( 2 / m )( -1 + z ^ m ) ^ ( -2 / m ) Hypergeometric2F1[1 / m, 2 / m, 1 + 1 / m, z ^ m]
+			//AdvancedMath.Hypergeometric2F1( )
+			throw new System.NotImplementedException();
 		}
 	}
 }

@@ -244,6 +244,9 @@
 					case SphericalModel.Sinusoidal:
 						model = "sinusoidal";
 						break;
+					case SphericalModel.PierceQuincuncial:
+						model = "Pierce quincuncial";
+						break;
 					}		
 					break;
 				}

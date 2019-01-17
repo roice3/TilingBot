@@ -92,7 +92,7 @@
 			}
 		}
 
-		static string ArchiveToWorking( Tiler.Settings settings )
+		public static string ArchiveToWorking( Tiler.Settings settings )
 		{
 			string imagePath = settings.FileName;
 			string newPath = Path.Combine( Persistence.WorkingDir, imagePath );
@@ -107,16 +107,32 @@
 
 		static void TestCurrentQueue()
 		{
+			Test.IsTesting = true;
 			string localWorkingDir = Persistence.WorkingDir;
 			string testDir = Path.Combine( localWorkingDir, "queueTest" );
 			DirectoryInfo di = new DirectoryInfo( testDir );
 			foreach( FileInfo file in di.GetFiles() )
 				file.Delete();
 
-			string workingDir = @"D:\TilingBot\working\";
+			string workingDir = @"D:\GitHub\TilingBot\TilingBot\working";
+			workingDir = @"D:\TilingBot\working";
 			Persistence.WorkingDir = workingDir;
 			string[] queue = File.ReadAllLines( Persistence.QueueFile );
+			//string[] queue = Directory.GetFiles( Path.Combine( workingDir, "queue" ), "*.xml" ).Select( p => Path.GetFileNameWithoutExtension( p ) ).ToArray();
+
 			List<string> tweetStrings = new List<string>();
+			foreach( string qi in queue )
+			{
+				string fullPath = Path.Combine( Persistence.QueueDir, qi + ".xml" );
+				Tiler.Settings settings = Persistence.LoadSettings( fullPath );
+				StandardInputs( settings );
+
+				string tweetString = Tweet.Format( settings );
+				Console.WriteLine( tweetString + "\n" );
+				tweetStrings.Add( tweetString );
+			}
+			File.WriteAllLines( Path.Combine( testDir, "tweetStrings.txt" ), tweetStrings.ToArray() );
+
 			foreach( string qi in queue )
 			{
 				m_timestamp = DateTime.Now;
@@ -134,8 +150,6 @@
 				string newPath = Path.Combine( testDir, imagePath );
 				File.Move( imagePath, newPath );
 			}
-
-			File.WriteAllLines( Path.Combine( testDir, "tweetStrings.txt" ), tweetStrings.ToArray() );
 		}
 
 		static async Task CheckRequests()
@@ -228,9 +242,11 @@
 
 			if( g == Geometry.Euclidean )
 			{
-				if( settings.EuclideanModel == EuclideanModel.Isometric )
+				if( settings.EuclideanModel == EuclideanModel.Isometric ||
+					settings.EuclideanModel == EuclideanModel.Loxodromic )
 				{
-					// I don't really like how the rotations look in the Euclidean case.
+					// I don't really like how the rotations look in the plane.
+					// For Loxodromic, things won't line up if we allow this.
 					a = 0;
 				}
 				else if( settings.EuclideanModel == EuclideanModel.Conformal )
@@ -303,7 +319,7 @@
 			{
 			case Geometry.Spherical:
 				{
-					int model = 1 + RandIntWeighted( rand, new int[] { 30, 20, 5, 15, 5, 20, 15 } );
+					int model = 1 + RandIntWeighted( rand, new int[] { 30, 20, 5, 15, 5, 20, 15, 15, 15 } );
 					if( model == 2 )
 						settings.SphericalModel = SphericalModel.Gnomonic;
 					if( model == 3 )
@@ -316,6 +332,10 @@
 						settings.SphericalModel = SphericalModel.Mercator;
 					if( model == 7 )
 						settings.SphericalModel = SphericalModel.Orthographic;
+					if( model == 8 )
+						settings.SphericalModel = SphericalModel.Sinusoidal;
+					if( model == 9 )
+						settings.SphericalModel = SphericalModel.PierceQuincuncial;
 					break;
 				}
 			case Geometry.Euclidean:
@@ -331,7 +351,7 @@
 				}
 			case Geometry.Hyperbolic:
 				{
-					int model = 1 + RandIntWeighted( rand, new int[] { 30, 20, 20, 20, 10 } );
+					int model = 1 + RandIntWeighted( rand, new int[] { 30, 20, 20, 20, 10, 20, 15, 15 } );
 					if( model == 2 )
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
@@ -340,6 +360,12 @@
 						settings.HyperbolicModel = HyperbolicModel.Band;
 					if( model == 5 )
 						settings.HyperbolicModel = HyperbolicModel.Orthographic;
+					if( model == 6 )
+						settings.HyperbolicModel = HyperbolicModel.Square;
+					if( model == 7 )
+						settings.HyperbolicModel = HyperbolicModel.InvertedPoincare;
+					if( model == 8 )
+						settings.HyperbolicModel = HyperbolicModel.Joukowsky;
 					break;
 				}
 			}
@@ -361,7 +387,7 @@
 		internal static void StandardInputs( Tiler.Settings settings )
 		{
 			settings.Antialias = Test.IsTesting ? false : true;
-			int size = Test.IsTesting ? 900 : 1200;
+			int size = Test.IsTesting ? 900 : 1200;// 4800;
 			settings.Width = size;
 			settings.Height = size;
 
@@ -370,7 +396,7 @@
 			{
 			case Geometry.Spherical:
 				if( settings.SphericalModel == SphericalModel.Sterographic )
-					settings.Bounds = 6;
+					settings.Bounds = 6.5;
 				else if( settings.SphericalModel == SphericalModel.Equirectangular ||
 						 settings.SphericalModel == SphericalModel.Sinusoidal )
 				{
@@ -390,11 +416,18 @@
 				{
 					settings.Bounds = diskBounds;
 				}
+				else if( settings.SphericalModel == SphericalModel.PierceQuincuncial )
+					settings.Bounds = 4;
 				else
 					settings.Bounds = 2;
 				break;
 			case Geometry.Euclidean:
-				settings.Bounds = settings.EuclideanModel == EuclideanModel.Isometric ? 2 : diskBounds;
+				if( settings.EuclideanModel == EuclideanModel.Isometric ||
+					settings.EuclideanModel == EuclideanModel.Spiral ||
+					settings.EuclideanModel == EuclideanModel.Loxodromic )
+					settings.Bounds = 2;
+				else
+					settings.Bounds = diskBounds;
 				break;
 			case Geometry.Hyperbolic:
 				settings.Bounds =  diskBounds;
@@ -404,9 +437,11 @@
 					settings.Height = (int)(settings.Height / factor);
 					settings.Width = (int)(settings.Width * factor);
 				}
-				if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
+				else if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
 					settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
 					settings.Bounds = 5;
+				else if( settings.HyperbolicModel == HyperbolicModel.Joukowsky )
+					settings.Bounds = 1.5;
 				break;
 			}
 
