@@ -234,9 +234,13 @@
 				if( iiMirrors() )
 					return;
 
-				TilingConfig config = new TilingConfig( P, Q, 1 );
-				Tile baseTile = Tiling.CreateBaseTile( config );
-				Segment seg = baseTile.Boundary.Segments[0];
+				Polygon baseTile = new Polygon();
+				baseTile.CreateRegular( P, Q );
+				//double q = 4.0 / ( P - 2 ) + 2;	// Make Euclidean.
+				//baseTile.CreateRegular( P, q );
+				//double pow = ( this.Anim + 0.5 ) * 2;
+				//baseTile.CreateRegular( P, Math.Pow( 3, pow ) );
+				Segment seg = baseTile.Segments[0];
 
 				// Order needs to match mirrors.
 				// Order is mirrors opposite: vertex, edge, center.
@@ -1097,8 +1101,8 @@
 					case SphericalModel.Sinusoidal:
 						v = SphericalModels.SinusoidalToStereo( v );
 						break;
-					case SphericalModel.PierceQuincuncial:
-						v = Util.PierceToStereo( v );
+					case SphericalModel.PeirceQuincuncial:
+						v = Util.PeirceToStereo( v );
 						break;
 					}
 					break;

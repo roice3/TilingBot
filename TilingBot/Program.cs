@@ -335,7 +335,7 @@
 					if( model == 8 )
 						settings.SphericalModel = SphericalModel.Sinusoidal;
 					if( model == 9 )
-						settings.SphericalModel = SphericalModel.PierceQuincuncial;
+						settings.SphericalModel = SphericalModel.PeirceQuincuncial;
 					break;
 				}
 			case Geometry.Euclidean:
@@ -416,7 +416,7 @@
 				{
 					settings.Bounds = diskBounds;
 				}
-				else if( settings.SphericalModel == SphericalModel.PierceQuincuncial )
+				else if( settings.SphericalModel == SphericalModel.PeirceQuincuncial )
 					settings.Bounds = 4;
 				else
 					settings.Bounds = 2;

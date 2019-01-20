@@ -171,7 +171,7 @@
 			return Vector3D.FromComplex( result );
 		}
 
-		public static Vector3D PierceToStereo( Vector3D p )
+		public static Vector3D PeirceToStereo( Vector3D p )
 		{
 			return SquareToPoincare( p );
 		}
