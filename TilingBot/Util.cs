@@ -59,6 +59,70 @@
 			throw new System.ArgumentException();
 		}
 
+		public static double Smoothed( double input, double max )
+		{
+			return (max / 2.0) * (-Math.Cos( Math.PI * input ) + 1);
+		}
+
+		/// <summary>
+		/// https://paramanands.blogspot.com/2011/01/elliptic-functions-complex-variables.html#.W14TVtJKiUl
+		/// equation 14.
+		/// </summary>
+		public static Complex JacobiCn( Complex u, double k )
+		{
+			// k prime
+			double k_ = Math.Sqrt( 1 - k * k );
+
+			double cnx = AdvancedMath.JacobiCn( u.Real, k );
+			double snx = AdvancedMath.JacobiSn( u.Real, k );
+			double dnx = AdvancedMath.JacobiDn( u.Real, k );
+			double cny = AdvancedMath.JacobiCn( u.Imaginary, k_ );
+			double sny = AdvancedMath.JacobiSn( u.Imaginary, k_ );
+			double dny = AdvancedMath.JacobiDn( u.Imaginary, k_ );
+
+			double denom = cny * cny + k * k * snx * snx * sny * sny;
+			double real = cnx * cny / denom;
+			double imag = -snx * dnx * sny * dny / denom;
+
+			return new Complex( real, imag );
+		}
+
+		/// <summary>
+		/// See this paper: http://archive.bridgesmathart.org/2016/bridges2016-179.pdf
+		/// This logically belongs in HyperbolicModels.cs, but I didn't want the dependency on Meta.Numerics in R3.Core.
+		/// </summary>
+		public static Vector3D SquareToPoincare( Vector3D s )
+		{
+			double K_e = AdvancedMath.EllipticF( Math.PI / 2, 1.0 / Math.Sqrt( 2 ) );
+			Complex a = new Complex( 1, -1 ) / Math.Sqrt( 2 );
+			Complex b = new Complex( 1, 1 ) / 2;
+			Complex z = s;
+
+			Complex result = a * JacobiCn( K_e * ( b * z - 1 ), 1 / Math.Sqrt( 2 ) );
+			return Vector3D.FromComplex( result );
+		}
+
+		public static Vector3D PeirceToStereo( Vector3D p )
+		{
+			return SquareToPoincare( p );
+		}
+
+		/// <summary>
+		/// https://www.physicsforums.com/threads/conformal-map-for-regular-polygon-in-circle.89759/
+		/// https://math.stackexchange.com/questions/1528270/numerical-libraries-and-special-function-of-complex-parameters/1528299#1528299
+		/// </summary>
+		public static Complex PolygonToPoincare( Vector3D p )
+		{
+			//z( 1 - z ^ m ) ^ ( 2 / m )( -1 + z ^ m ) ^ ( -2 / m ) Hypergeometric2F1[1 / m, 2 / m, 1 + 1 / m, z ^ m]
+			//AdvancedMath.Hypergeometric2F1( )
+			throw new System.NotImplementedException();
+		}
+
+		//
+		// Hyperbolic utility functions.
+		// ZZZ - Move to shared location.
+		//
+
 		public static double LorentzDot( Vector3D v1, Vector3D v2 )
 		{
 			return -( v1.X * v2.X + v1.Y * v2.Y - v1.Z * v2.Z );
@@ -128,63 +192,66 @@
 			throw new System.ArgumentException();
 		}
 
-		public static double Smoothed( double input, double max )
+		public static Vector3D EdgeToPlane( Geometry g, H3.Cell.Edge edge )
 		{
-			return (max / 2.0) * (-Math.Cos( Math.PI * input ) + 1);
+			if( g != Geometry.Hyperbolic )
+				throw new System.NotImplementedException();
+
+			Vector3D b1, b2;
+			H3Models.Ball.GeodesicIdealEndpoints( edge.Start, edge.End, out b1, out b2 );
+			if( ( ( b2 + b1 ) / 2 ).IsOrigin )
+			{
+				Vector3D lineNormal = b2 - b1;
+				lineNormal.RotateXY( Math.PI / 2 );
+				lineNormal.Normalize();
+				return new Vector3D( lineNormal.X, lineNormal.Y, lineNormal.Z, 0 );
+			}
+
+			Vector3D center, normal;
+			double radius, angleTot;
+			H3Models.Ball.Geodesic( edge.Start, edge.End, out center, out radius, out normal, out angleTot );
+
+			Vector3D closest = H3Models.Ball.ClosestToOrigin( new Circle3D() { Center = center, Radius = radius, Normal = normal } );
+			Vector3D closestKlein = HyperbolicModels.PoincareToKlein( closest );
+			center.Normalize();
+			return new Vector3D( center.X, center.Y, center.Z, closestKlein.Abs() );
 		}
 
-		/// <summary>
-		/// https://paramanands.blogspot.com/2011/01/elliptic-functions-complex-variables.html#.W14TVtJKiUl
-		/// equation 14.
-		/// </summary>
-		public static Complex JacobiCn( Complex u, double k )
+		// In hyperboloid model
+		public static Vector3D PlaneDualPoint( Geometry g, Vector3D planeKlein )
 		{
-			// k prime
-			double k_ = Math.Sqrt( 1 - k * k );
+			if( g != Geometry.Hyperbolic )
+				throw new System.NotImplementedException();
 
-			double cnx = AdvancedMath.JacobiCn( u.Real, k );
-			double snx = AdvancedMath.JacobiSn( u.Real, k );
-			double dnx = AdvancedMath.JacobiDn( u.Real, k );
-			double cny = AdvancedMath.JacobiCn( u.Imaginary, k_ );
-			double sny = AdvancedMath.JacobiSn( u.Imaginary, k_ );
-			double dny = AdvancedMath.JacobiDn( u.Imaginary, k_ );
+			if( Math.Abs( planeKlein.W ) < 1e-7 )
+			{
+				return new Vector3D( planeKlein.X, planeKlein.Y, 0.0 );
+			}
 
-			double denom = cny * cny + k * k * snx * snx * sny * sny;
-			double real = cnx * cny / denom;
-			double imag = -snx * dnx * sny * dny / denom;
+			double inv = 1.0 / planeKlein.W;
+			//Vector3D dual = new Vector3D( planeKlein.X * inv, planeKlein.Y * inv, planeKlein.Z * inv, 1.0 );
+			Vector3D dual = new Vector3D( planeKlein.X * inv, planeKlein.Y * inv, 1.0 );    // Turn into 2D, would be nice to be more general.
 
-			return new Complex( real, imag );
+			//NormalizeInGeometry( g, ref dual );
+			// Ugh, sign convention of function above messing me up.
+			System.Func<Vector3D, Vector3D> lorentzNormalize = v =>
+			{
+				double normSquared = Math.Abs( LorentzDot( v, v ) );
+				double norm = Math.Sqrt( normSquared );
+				v /= norm;
+				return v;
+			};
+
+			dual = lorentzNormalize( dual );
+
+			return dual;
 		}
 
-		/// <summary>
-		/// See this paper: http://archive.bridgesmathart.org/2016/bridges2016-179.pdf
-		/// This logically belongs in HyperbolicModels.cs, but I didn't want the dependency on Meta.Numerics in R3.Core.
-		/// </summary>
-		public static Vector3D SquareToPoincare( Vector3D s )
+		// In hyperboloid model
+		public static double GeodesicPlaneHSDF( Vector3D samplePoint, Vector3D dualPoint, double offset = 0 )
 		{
-			double K_e = AdvancedMath.EllipticF( Math.PI / 2, 1.0 / Math.Sqrt( 2 ) );
-			Complex a = new Complex( 1, -1 ) / Math.Sqrt( 2 );
-			Complex b = new Complex( 1, 1 ) / 2;
-			Complex z = s;
-
-			Complex result = a * JacobiCn( K_e * ( b * z - 1 ), 1 / Math.Sqrt( 2 ) );
-			return Vector3D.FromComplex( result );
-		}
-
-		public static Vector3D PeirceToStereo( Vector3D p )
-		{
-			return SquareToPoincare( p );
-		}
-
-		/// <summary>
-		/// https://www.physicsforums.com/threads/conformal-map-for-regular-polygon-in-circle.89759/
-		/// https://math.stackexchange.com/questions/1528270/numerical-libraries-and-special-function-of-complex-parameters/1528299#1528299
-		/// </summary>
-		public static Complex PolygonToPoincare( Vector3D p )
-		{
-			//z( 1 - z ^ m ) ^ ( 2 / m )( -1 + z ^ m ) ^ ( -2 / m ) Hypergeometric2F1[1 / m, 2 / m, 1 + 1 / m, z ^ m]
-			//AdvancedMath.Hypergeometric2F1( )
-			throw new System.NotImplementedException();
+			double dot = -DotInGeometry( Geometry.Hyperbolic, samplePoint, dualPoint );
+			return DonHatch.asinh( dot ) - offset;
 		}
 	}
 }

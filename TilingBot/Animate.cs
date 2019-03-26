@@ -19,33 +19,93 @@
 		public static void Gen()
 		{
 			Tiler.Settings settings = Program.GenSettings( tweeting: false );
-			//settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2018-12-03_22-06-02.xml" ) );
-			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2019-1-14_14-54-14.xml" ) );
-			//settings.P = 12;
-			//settings.Q = 4;
-			//settings.P = 3;
-			//settings.ShowCoxeter = true;
-			//settings.EuclideanModel = EuclideanModel.Isometric;
-			//settings.HyperbolicModel = HyperbolicModel.Poincare;
-			//settings.SphericalModel = SphericalModel.Sterographic;
-			settings.Colors = new Color[] { Color.MidnightBlue };
+			//settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2019-1-17_23-08-44.xml" ) );
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2019-3-18_21-49-38.xml" ) );
+			// Make custom setting edits here.
+			//settings.VertexWidth = 0.0;
+			settings.P = 4;
+			settings.Q = 8;
+			settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex1;
+			Mobius mOrig = settings.Mobius;
 			Program.StandardInputs( settings );
 
-			int numFrames = Test.IsTesting ? 10 : 180;
-			//numFrames = 6;
+			int numFrames = Test.IsTesting ? 20 : 180;
 
 			Vector3D pStart = new Vector3D();
+			//Vector3D pEnd = new Vector3D( 0, OffsetInModel( settings, 2, 0, 0 ) );
 			Vector3D pEnd = new Vector3D( OffsetInModel( settings, 0, 2, 0 ), 0 );
-			pEnd.RotateXY( Math.PI / settings.P );
+			//pEnd.RotateXY( Math.PI / settings.P );
 			//pEnd.RotateXY( Math.PI / 2 );
 
 			/*pStart = settings.Verts[0];
 			pEnd = pStart;
 			pEnd.RotateXY( 2 * Math.PI / settings.P );*/
 
+			settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex2;
+			Mobius t = settings.CenteringMobius();
+			//pStart = t.Apply( pStart );
+			//pEnd = t.Apply( pEnd );
+
 			Vector3D[] points = TextureHelper.SubdivideSegmentInGeometry( pStart, pEnd, numFrames, settings.Geometry );
 
-			for( int i = 0; i <= numFrames; i++ )
+			/*
+			// Array of Mobius transforms.
+
+			System.Func<Vector3D, double, Vector3D> pointInDirAtDist = (dir, hDist) =>
+			{
+				dir.Normalize();
+				dir *= DonHatch.h2eNorm( hDist );
+				return dir;
+			};
+
+			List<double> distancesSmoothed = new List<double>();
+			List<double> anglesSmoothed = new List<double>();
+			for( int i=0; i<numFrames; i++ )
+			{
+				double frac = (double)i / numFrames;
+				double smoothedFrac = Util.Smoothed( frac, 1.0 );
+				distancesSmoothed.Add( smoothedFrac * DonHatch.e2hNorm( pEnd.Abs() ) );
+				anglesSmoothed.Add( smoothedFrac * Math.PI / 2 );
+			}
+			Vector3D[] pointsSmoothed = distancesSmoothed.Select( d => pointInDirAtDist( pEnd, d ) ).ToArray();
+
+			// Build up a set of Mobius transformations.
+			Mobius trans = new Mobius(), rot = new Mobius(), runningStep = Mobius.Identity();
+			trans.Geodesic( settings.Geometry, pStart.ToComplex(), pEnd.ToComplex() );
+			rot.Isometry( Geometry.Euclidean, Math.PI / 2, new Complex() );
+			List<Mobius> mList = new List<Mobius>();
+			List<H3.Cell.Edge[]> globalEdges = new List<H3.Cell.Edge[]>();
+			List<H3.Cell.Edge> completedEdges = new List<H3.Cell.Edge>();
+			for( int s=0; s<=5; s++ )
+			{
+				for( int i = 0; i < numFrames * 2; i++ )
+				{
+					List<H3.Cell.Edge> frameEdges = new List<H3.Cell.Edge>();
+					Mobius m = new Mobius();
+					if( i < numFrames )
+					{
+						Vector3D pCurrent = pointsSmoothed[i];
+						m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
+						mList.Add( runningStep * m );
+						frameEdges.Add( new H3.Cell.Edge( runningStep.Apply( pStart ), runningStep.Apply( pCurrent ) ) );
+					}
+					else
+					{
+						m.Isometry( Geometry.Euclidean, anglesSmoothed[i-numFrames], new Complex() );
+						mList.Add( runningStep * trans * m );
+						frameEdges.Add( new H3.Cell.Edge( runningStep.Apply( pStart ), runningStep.Apply( pEnd ) ) );
+					}
+					frameEdges.AddRange( completedEdges );
+					globalEdges.Add( frameEdges.ToArray() );
+				}
+				completedEdges.Add( new H3.Cell.Edge( runningStep.Apply( pStart ), runningStep.Apply( pEnd ) ) );
+				runningStep *= trans * rot;
+			}
+			*/
+
+			double ew = settings.EdgeWidth;
+
+			for( int i = 0; i < numFrames; i++ )
 			{
 				string numString = i.ToString();
 				numString = numString.PadLeft( 3, '0' );
@@ -56,38 +116,50 @@
 				// Setup the Mobius.
 				Vector3D pCurrent = points[i];
 				Mobius m = Mobius.Identity(), mInitOff = Mobius.Identity(), mInitRot = Mobius.Identity(), mCentering = Mobius.Identity(), mModel = Mobius.Identity();
-				settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex2;
+				//mInitRot = Mobius.CreateFromIsometry( Geometry.Euclidean, frac * 2 * Math.PI, new Complex() );
+				//settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex2;
 				//mCentering = settings.CenteringMobius();
+				double rot = frac * 2 * Math.PI / 2;
+				settings.ImageRot = -rot;
 
 				//mInitOff = OffsetMobius( settings );
-				//mInitRot = Mobius.CreateFromIsometry( Geometry.Euclidean, -Math.PI / 4, new Complex() );
+				mInitRot = Mobius.CreateFromIsometry( Geometry.Euclidean, -Math.PI / 4, new Complex() );
 
 				//m.Isometry( settings.Geometry, Math.PI / 4, pCurrent.ToComplex() );
 				//m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
+				//m = mCentering * m * mCentering.Inverse();
 
 				// Rotation
 				double xOff = OffsetInModel( settings, 0, 0, 1 );
-				//m = RotAboutPoint( settings, new Vector3D( xOff, 0 ), frac * 2 * Math.PI / settings.Q );
-				//m = LimitRot( settings, Math.PI/4, 2*frac );
-				m = RotAboutPoint( settings.Geometry, new Vector3D(0,1), frac * 2 * Math.PI );
+				m = RotAboutPoint( settings.Geometry, new Vector3D( 0, 0 ), rot );
+				//m = RotAboutPoint( settings.Geometry, new Vector3D( xOff, 0 ),/* -frac * Math.PI*/ -frac * 2 * Math.PI / settings.Q );
+				//m = LimitRot( settings, 0*Math.PI/4, 2*frac );
+				//m = RotAboutPoint( settings.Geometry, new Vector3D(0,0), frac * 2 * Math.PI / settings.P );
+				//m = mList[i];
 
-				settings.Anim = Util.Smoothed( frac, 1.0 );
+				settings.Anim = frac;// Util.Smoothed( frac, 1.0 );
+
+				// Change edge width.
+				//double fact = 1 + settings.Anim * 20;
+				//settings.EdgeWidth = ew * fact;
+
+				//settings.GlobalEdges = globalEdges[i];
 
 				Console.WriteLine( Tweet.Format( settings ) + "\n" );
 				string newPath = Path.Combine( Persistence.AnimDir, settings.FileName );
-				//if( File.Exists( newPath ) )
-				//	continue;
+				if( File.Exists( newPath ) )
+					continue;
 
 				// Need to do this when animating where edges need recalc.
 				settings.Init();
-				
+
 				//mModel = RotAboutPoint( Geometry.Spherical, new Vector3D( 1, 0 ), 2 * Math.PI * frac );
 				//Mobius mZoom = Mobius.Scale( 1.0 / ( 1.0 - Util.Smoothed( 2*frac, 0.8 ) ) );
 				//mModel *= mZoom;
 
 				// We will control the Mobius transformation ourself.
 				// NOTE: Needs to be done after Init call above, or it will get clobbered.
-				settings.Mobius = mCentering * m * mInitOff * mInitRot * mModel;
+				settings.Mobius = m * mCentering * mInitOff * mInitRot * mModel;
 				settings.Centering = Tiler.Centering.General;
 				//settings.Mobius = RotAboutPoint( settings, new Vector3D(), Math.PI / 6 );
 
@@ -104,12 +176,17 @@
 			}
 		}
 
-		static public double OffsetInModel(Tiler.Settings settings, double p = 0, double q = 0, double r = 1)
+		static public double OffsetInSpace(Tiler.Settings settings, double p = 0, double q = 0, double r = 1)
 		{
-			double off =
+			return
 				p * Geometry2D.GetTrianglePSide( settings.P, settings.Q ) +
 				q * Geometry2D.GetTriangleQSide( settings.P, settings.Q ) +
 				r * Geometry2D.GetTriangleHypotenuse( settings.P, settings.Q );
+		}
+
+		static public double OffsetInModel(Tiler.Settings settings, double p = 0, double q = 0, double r = 1)
+		{
+			double off = OffsetInSpace( settings, p, q, r );
 			switch( settings.Geometry )
 			{
 				case Geometry.Spherical:

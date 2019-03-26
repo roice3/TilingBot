@@ -315,6 +315,9 @@
 					case HyperbolicModel.Joukowsky:
 						model = "Joukowsky";
 						break;
+					case HyperbolicModel.Ring:
+						model = "ring";
+						break;
 					}
 					break;
 				}

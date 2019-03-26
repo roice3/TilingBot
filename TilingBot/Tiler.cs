@@ -35,6 +35,17 @@
 		{
 			public Settings()
 			{
+				SetDefaults();
+			}
+
+			[OnDeserializing]
+			private void OnDeserializing( StreamingContext context )
+			{
+				SetDefaults();
+			}
+
+			private void SetDefaults()
+			{
 				Antialias = true;
 
 				EdgeWidth = 0.025;
@@ -45,6 +56,7 @@
 				HyperbolicModel = HyperbolicModel.Poincare;
 				ColoringOption = 0;
 				GeodesicLevels = 0;
+				RingRepeats = 5;
 			}
 
 			[DataMember]
@@ -72,6 +84,10 @@
 			[DataMember]
 			public int GeodesicLevels { get; set; }
 
+
+			[DataMember]
+			public int RingRepeats { get; set; }
+
 			[DataMember]
 			public double EdgeWidth { get; set; }
 
@@ -97,6 +113,9 @@
 			public bool ShowCoxeter { get; set; }
 
 			[DataMember]
+			public bool CirclePacking { get; set; }
+
+			[DataMember]
 			public int ColoringOption { get; set; }
 
 			[DataMember]
@@ -119,9 +138,28 @@
 			public bool Antialias { get; set; }
 
 			/// <summary>
+			/// A rotation of the entire image.
+			/// </summary>
+			public double ImageRot { get; set; }
+
+			public double PeriodBand
+			{
+				get
+				{
+					if( Geometry != Geometry.Hyperbolic )
+						throw new System.NotImplementedException();
+
+					Vector3D off = new Vector3D( DonHatch.h2eNorm( Animate.OffsetInSpace( this, 0, 2, 2 ) ), 0 );
+					return HyperbolicModels.PoincareToBand( off ).X;
+				}
+			}
+
+			/// <summary>
 			/// Used for animations, in range [0,1]
 			/// </summary>
 			public double Anim { get; set; }
+
+			public H3.Cell.Edge[] GlobalEdges { get; set; }
 
 			public Geometry Geometry
 			{
@@ -152,8 +190,15 @@
 
 			public EdgeInfo[] UniformEdges { get; set; }
 
+			private void ResolveSettingDiscrepencies()
+			{
+				if( CirclePacking )
+					Dual = false;
+			}
+
 			public void Init()
 			{
+				ResolveSettingDiscrepencies();
 				CalcMirrors();
 
 				List<EdgeInfo> ei = new List<EdgeInfo>();
@@ -909,6 +954,16 @@
 
 				p = m.Apply( p );
 
+				// Circle packing?
+				if( settings.CirclePacking )
+				{
+					double eLength = settings.DistInGeometry( e.Start, e.End ) / 2;
+					double compare = settings.DistInGeometry( p, new Vector3D() );
+					if( Math.Abs( eLength - compare ) < cutoffInGeometry )
+						return true;
+					return false;
+				}
+
 				// Dots near the starting point.
 				if( p.Abs() < settings.VertexWidth * widthFactor )
 					return true;
@@ -950,6 +1005,14 @@
 				double a = Angles[edgeIdx];
 
 				p = m.Apply( p );
+
+				// Circle packing?
+				if( settings.CirclePacking )
+				{
+					double eLength = settings.DistInGeometry( e.Start, e.End ) / 2;
+					double compare = settings.DistInGeometry( p, new Vector3D() );
+					return Math.Abs( eLength - compare );
+				}
 
 				double dOrigin = settings.DistInGeometry( p, new Vector3D() );
 
@@ -1071,6 +1134,8 @@
 		/// </summary>
 		private Vector3D ApplyTransformation( Vector3D v )
 		{
+			v.RotateXY( m_settings.ImageRot );
+
 			// Now, apply the model, which depends on the geometry.
 			switch( m_settings.Geometry )
 			{
@@ -1187,10 +1252,14 @@
 						v *= mag;
 						break;
 					case HyperbolicModel.Joukowsky:
-								double off = 0.25;
-								double amt = m_settings.Anim * 2 * Math.PI;
-								Vector3D cen = new Vector3D( Math.Cos( amt ) * off, Math.Sin( amt ) * off );
+						/*double off = 0.25;
+						double amt = m_settings.Anim * 2 * Math.PI;
+						Vector3D cen = new Vector3D( Math.Cos( amt ) * off, Math.Sin( amt ) * off );*/
+						Vector3D cen = new Vector3D();
 						v = HyperbolicModels.JoukowskyToPoincare( v, cen );
+						break;
+					case HyperbolicModel.Ring:
+						v = HyperbolicModels.RingToPoincare( v, m_settings.PeriodBand, m_settings.RingRepeats );
 						break;
 					}
 					break;
@@ -1250,11 +1319,25 @@
 			throw new System.Exception( "Unhandled case in DrawLimit check." );
 		}
 
+		private static Color bgColor = Color.FromArgb( 0, 255, 255, 255 );
+
 		private bool OutsideBoundary( Settings settings, Vector3D v, out Color color )
 		{
-			Color bgColor = Color.FromArgb( 0, 255, 255, 255 );
+			if( settings.Geometry == Geometry.Hyperbolic &&
+				settings.HyperbolicModel == HyperbolicModel.Ring )
+			{
+				Vector3D v1 = HyperbolicModels.BandToRing( new Vector3D( 0, 1 ), settings.PeriodBand, settings.RingRepeats );
+				Vector3D v2 = HyperbolicModels.BandToRing( new Vector3D( 0, -1 ), settings.PeriodBand, settings.RingRepeats );
+				if( v.Abs() < v1.Abs() || v.Abs() > v2.Abs() )
+				{
+					color = bgColor;
+					return true;
+				}
+			}
+
 			if( DrawLimit( settings ) )
 			{
+				v.RotateXY( settings.ImageRot );
 				double compare = v.Abs();
 				if( settings.Geometry == Geometry.Euclidean &&
 					settings.EuclideanModel == EuclideanModel.UpperHalfPlane )
@@ -1266,7 +1349,9 @@
 					else if( settings.HyperbolicModel == HyperbolicModel.Band )
 						compare = Math.Abs( v.Y );
 					else if( settings.HyperbolicModel == HyperbolicModel.Square )
+					{
 						compare = Math.Max( Math.Abs( v.X ), Math.Abs( v.Y ) );
+					}
 					else if( settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
 						compare = 1.0 / v.Abs();
 				}
@@ -1370,8 +1455,52 @@
 			return Color.White;
 		}
 
+		private bool GlobalDisk( double r, Vector3D v )
+		{
+			return v.Abs() < r;
+		}
+
+		private bool GlobalEdge( H3.Cell.Edge e, double r, Vector3D v )
+		{
+			Geometry g = m_settings.Geometry;
+			if( e.Start == e.End )
+				return false;
+
+			Vector3D planeDual = Util.PlaneDualPoint( g, Util.EdgeToPlane( g, e ) );
+			Vector3D hyperboloidPoint3D = Sterographic.PoincareBallToHyperboloid( v );
+			double dist = Util.GeodesicPlaneHSDF( new Vector3D( hyperboloidPoint3D.X, hyperboloidPoint3D.Y, hyperboloidPoint3D.W ), planeDual );
+			return Math.Abs( dist ) < r 
+				&& H3Models.Ball.HDist( v, e.Start ) + H3Models.Ball.HDist( v, e.End ) - H3Models.Ball.HDist( e.Start, e.End ) < r ;
+		}
+
+		private Color? Globals( Vector3D v )
+		{
+			return null;
+			foreach( H3.Cell.Edge e in m_settings.GlobalEdges )
+				if( GlobalEdge( e, .03, v ) )
+					return Color.White;
+
+			if( GlobalDisk( .06, v ) )
+				return Color.Gray;
+
+			Mobius m = new Mobius();
+			m.Isometry( Geometry.Hyperbolic, -Math.PI/4, new Complex( 0, 0.48586827175664565 ) );
+			if( GlobalDisk( .04, m.Apply( v ) ) )
+				return Color.Blue;
+
+			m.Isometry( Geometry.Hyperbolic, -Math.PI / 4 - Math.PI/2, new Complex( 0, 0.48586827175664565 ) );
+			if( GlobalDisk( .04, m.Apply( v ) ) )
+				return Color.Red;
+
+			return null;
+		}
+
 		private Color CalcColor( Settings settings, Vector3D v )
 		{
+			Color? gc = Globals( v );
+			if( gc.HasValue )
+				return gc.Value;
+
 			int[] flips = new int[3];
 			List<int> allFlips = new List<int>();
 			if( !ReflectToFundamental( settings, ref v, ref flips, allFlips ) )
@@ -1592,8 +1721,8 @@
 			Color darkish = ColorTranslator.FromHtml( "#BCBABE" );
 			if( hexagonColoring )
 			{
-				int incrementsUntilRepeat = 30;
-				int offset = 18;
+				int incrementsUntilRepeat = 40;
+				int offset = 4;
 				int count = settings.ShowCoxeter ? reflections : flips[2];
 				whitish = ColorUtil.ColorAlongHexagon( incrementsUntilRepeat, count + offset );
 				/*Color edgeColor = ColorUtil.Inverse( whitish );
@@ -1669,7 +1798,7 @@
 				if( m_texture == null )
 				{
 
-					string path = System.IO.Path.Combine( Persistence.WorkingDir, "gold.JPG" );
+					string path = System.IO.Path.Combine( Persistence.WorkingDir, "pie_2.JPG" );
 					m_texture = new Bitmap( path );
 					m_texture.RotateFlip( RotateFlipType.RotateNoneFlipY );
 				}
@@ -1680,7 +1809,8 @@
 				// Scale v so that the image will cover the f.d.
 				double s = 1.0 / ((settings.Verts[0].Abs() + 1) / 2);
 				//s *= 2.3;
-				//v *= s;
+				s *= 1.2;
+				v *= s;
 
 				// Get the pixel coords.
 				double size = w < h ? w : h;
@@ -1705,7 +1835,7 @@
 					return Color.FromArgb( 255, 0, 0, 0 );
 
 				Color result = m_texture.GetPixel( (int)x, (int)y );
-				double lOff = 0.1;
+				double lOff = 0.0;
 				if( reflections % 2 == 0 )
 					// result = ColorUtil.AvgColorSquare( new List<Color>( new Color[] { result, ColorTranslator.FromHtml( "#2a3132" ) } ) );
 					result = ColorUtil.AdjustL( result, result.GetBrightness() - lOff );
