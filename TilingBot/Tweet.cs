@@ -68,6 +68,10 @@
 			{
 				additionalInfo = CatalanDualString( settings );
 			}
+			else if( settings.CirclePacking )
+			{
+				additionalInfo = CirclePackingString( settings );
+			}
 			else
 			{
 				additionalInfo = Capitalize( ShortDesc( settings ) ) + ".";
@@ -129,6 +133,14 @@
 				return string.Empty;
 
 			return "Catalan tiling dual to " + ShortDesc( settings ) + ".";
+		}
+
+		private static string CirclePackingString( Tiler.Settings settings )
+		{
+			if( !settings.CirclePacking )
+				return string.Empty;
+
+			return "Circle packing based on " + ShortDesc( settings ) + ".";
 		}
 
 		private static string InfinitySafe( int i )
