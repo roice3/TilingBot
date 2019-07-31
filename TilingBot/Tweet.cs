@@ -418,10 +418,41 @@
 		{
 			TwitterContext twitterCtx = TwitterContext();
 
+			System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
+
 			Media media = await twitterCtx.UploadMediaAsync( File.ReadAllBytes( imagePath ), "image/png", "tweet_image" );
-			Status tweet = await twitterCtx.TweetAsync( status, new ulong[] { media.MediaID } );
-			if( tweet != null )
-				Console.WriteLine( $"Tweet sent: {tweet.Text}" );
+
+			Media mediaStatusResponse = null;
+			do
+			{
+				if( mediaStatusResponse != null )
+				{
+					int checkAfterSeconds = mediaStatusResponse?.ProcessingInfo?.CheckAfterSeconds ?? 0;
+					Console.WriteLine( $"Twitter video testing in progress - waiting {checkAfterSeconds} seconds." );
+					await Task.Delay( checkAfterSeconds * 1000 );
+				}
+
+				mediaStatusResponse =
+					await
+					( from stat in twitterCtx.Media
+					  where stat.Type == MediaType.Status &&
+							stat.MediaID == media.MediaID
+					  select stat )
+					.SingleOrDefaultAsync();
+			} while( mediaStatusResponse?.ProcessingInfo?.State == MediaProcessingInfo.InProgress );
+
+			if( mediaStatusResponse?.ProcessingInfo?.State == MediaProcessingInfo.Succeeded )
+			{
+				Status tweet = await twitterCtx.TweetAsync( status, new ulong[] { media.MediaID } );
+				if( tweet != null )
+					Console.WriteLine( $"Tweet sent: {tweet.Text}" );
+			}
+			else
+			{
+				MediaError error = mediaStatusResponse?.ProcessingInfo?.Error;
+				if( error != null )
+					Console.WriteLine( $"Request failed - Code: {error.Code}, Name: {error.Name}, Message: {error.Message}" );
+			}
 		}
 
 		public static async Task Reply( ulong tweetID, string status, string imagePath )
