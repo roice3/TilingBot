@@ -1189,7 +1189,7 @@
 						v = EuclideanModels.SpiralToIsometric( v, m_settings.P, 7, 3 );
 						break;
 					case EuclideanModel.Loxodromic:
-						v = EuclideanModels.LoxodromicToIsometric( v, m_settings.P, 7, 3 );
+						v = EuclideanModels.LoxodromicToIsometric( v, m_settings.P, 11, 3 );
 						break;
 					}
 					break;
@@ -1261,6 +1261,12 @@
 					case HyperbolicModel.Ring:
 						v = HyperbolicModels.RingToPoincare( v, m_settings.PeriodBand, m_settings.RingRepeats );
 						break;
+					case HyperbolicModel.Azimuthal_Equidistant:
+						v = HyperbolicModels.EquidistantToPoincare( v );
+						break;
+					case HyperbolicModel.Azimuthal_EqualArea:
+						v = HyperbolicModels.EqualAreaToPoincare( v );
+						break;
 					}
 					break;
 				}
@@ -1268,7 +1274,7 @@
 
 			// Branched cover?
 			/*Complex vc = v.ToComplex();
-			vc = vc * vc * vc;
+			vc = Complex.Pow( vc, 3.0 );
 			v = Vector3D.FromComplex( vc );*/
 
 			// Apply the centering one.
@@ -1310,7 +1316,9 @@
 			if( settings.Geometry == Geometry.Hyperbolic )
 			{ 
 				if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
-					settings.HyperbolicModel == HyperbolicModel.Joukowsky )
+					settings.HyperbolicModel == HyperbolicModel.Joukowsky ||
+					settings.HyperbolicModel == HyperbolicModel.Azimuthal_Equidistant ||
+					settings.HyperbolicModel == HyperbolicModel.Azimuthal_EqualArea )
 					return false;
 				else
 					return true;
@@ -1511,11 +1519,11 @@
 			case 0:
 				return ColorFunc0( settings, v, flips );
 			case 1:
-				return ColorFunc1( settings, v, flips );
+				return ColorFunc1( settings, v, flips, allFlips.ToArray() );
 			case 2:
 				return ColorFuncIntensity( settings, v, flips );
 			case 3:
-				return ColorFunc1( settings, v, flips, hexagonColoring: true );
+				return ColorFunc1( settings, v, flips, allFlips.ToArray(), hexagonColoring: true );
 			case 4:
 				return ColorFuncPicture( settings, v, flips, allFlips.ToArray() );
 			}
@@ -1576,6 +1584,51 @@
 			}
 
 			return true;
+		}
+
+		internal static Dictionary<double,int> GetTileCenters( Settings settings )
+		{
+			HashSet<Vector3D> completed = new HashSet<Vector3D>();
+			completed.Add( new Vector3D() );
+			ReflectRecursive( settings, new Vector3D[] { new Vector3D() }, completed );
+			//return completed.Select( v => DonHatch.e2hNorm( v.Abs() ) ).Distinct( new DoubleEqualityComparer() ).OrderBy( d => d ).ToArray();
+
+			Dictionary<double, int> result = new Dictionary<double, int>( new DoubleEqualityComparer() );
+			foreach( Vector3D v in completed )
+			{
+				double abs = DonHatch.e2hNorm( v.Abs() );
+				int count;
+				if( !result.TryGetValue( abs, out count ) )
+					count = 0;
+				count++;
+				result[abs] = count;
+			}
+			return result;
+		}
+
+		private static void ReflectRecursive( Settings settings, Vector3D[] centers, HashSet<Vector3D> completed )
+		{
+			int max = 1500000;
+			if( 0 == centers.Length || completed.Count >= max )
+				return;
+
+			HashSet<Vector3D> newCenters = new HashSet<Vector3D>();
+
+			foreach( Vector3D center in centers )
+			for( int m = 0; m < settings.Mirrors.Length; m++ )
+			{
+				CircleNE mirror = settings.Mirrors[m];
+				Vector3D v = mirror.ReflectPoint( center );
+
+				if( completed.Add( v ) )
+				{
+					// Haven't seen this point yet, so 
+					// we'll need to recurse on it.
+					newCenters.Add( v );
+				}
+			}
+
+			ReflectRecursive( settings, newCenters.ToArray(), completed );
 		}
 
 		private static bool ReflectAcrossMirrors( CircleNE[] mirrors, ref Vector3D v, ref List<int> allFlips, ref int[] flips, ref int iterationCount )
@@ -1693,7 +1746,7 @@
 		/// <summary>
 		/// TODO: support snubs
 		/// </summary>
-		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, bool hexagonColoring = false )
+		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, int[] allFlips, bool hexagonColoring = false )
 		{
 			int reflections = flips.Sum();
 			bool useStandardColors = ColoringData( settings, 0 ) == 0;
@@ -1716,13 +1769,24 @@
 				}
 			}
 
+			/*int layer, mod;
+			double frac;
+			GetAnimParams( settings, out layer, out mod, out frac );
+			int layer = 2, mod = 0;
+			whitish = TestColor( flips, allFlips, layer, mod ) ? settings.Colors[1] : whitish;
+			Color whitish = Color.FromArgb( 0, 0, 0, 0 );*/
+
 			Color whitish = ColorTranslator.FromHtml( "#F1F1F2" );
-			//Color whitish = Color.FromArgb( 0, 0, 0, 0 );
 			Color darkish = ColorTranslator.FromHtml( "#BCBABE" );
 			if( hexagonColoring )
 			{
-				int incrementsUntilRepeat = 40;
-				int offset = 4;
+				int incrementsUntilRepeat = 40; //30;
+				int offset = 4; //18;
+				if( settings.ColoringData.Length == 3 )
+				{
+					incrementsUntilRepeat = settings.ColoringData[1];
+					offset = settings.ColoringData[2];
+				}
 				int count = settings.ShowCoxeter ? reflections : flips[2];
 				whitish = ColorUtil.ColorAlongHexagon( incrementsUntilRepeat, count + offset );
 				/*Color edgeColor = ColorUtil.Inverse( whitish );
@@ -1738,7 +1802,53 @@
 				return whitish;
 
 			return reflections % 2 == 0 ? whitish : darkish;
-			// return flips[2] % 2 == 0 ? Color.Black : Color.White;	// Checkerboard
+			//return flips[2] % 2 == 0 ? Color.Black : Color.White;	// Checkerboard
+		}
+
+		private static void GetAnimParams( Settings settings, out int layer, out int mod, out double frac )
+		{
+			// To spend more time on early layers...
+			//double a = Math.Pow( settings.Anim, 1.5 );
+			double a = settings.Anim;
+
+			// We'll do 15 frames.
+			// Layer 1 is shorter.
+			a *= 15;
+			double layerDouble = ( a + 3 ) / 2;
+			layer = (int)Math.Floor( layerDouble );
+			if( layer == 1 )
+				mod = 0;
+			else
+				mod = (int)( a + 3 ) % 2;
+
+			frac = Util.Smoothed( layerDouble - layer, 1.0 );
+		}
+
+		private static bool TestColor( int[] flips, int[] allFlips, int layer, int mod )
+		{
+			if( flips[2] != layer )
+				return false;
+
+			if( layer == 1 )
+				return true;
+
+			int count0 = 0, count1 = 0;
+			int layerCount = 0;
+			for( int i=0; i<allFlips.Length; i++ )
+			{
+				if( allFlips[i] == 2 )
+					layerCount++;
+
+				if( !(layerCount == layer-1) )
+					continue;
+
+				if( allFlips[i] == 0 )
+					count0++;
+				if( allFlips[i] == 1 )
+					count1++;
+			}
+
+			return (count1) % 2 == mod;
 		}
 
 		/// <summary>
@@ -1798,9 +1908,9 @@
 				if( m_texture == null )
 				{
 
-					string path = System.IO.Path.Combine( Persistence.WorkingDir, "pie_2.JPG" );
+					string path = System.IO.Path.Combine( Persistence.WorkingDir, @"D:\temp\image.png" );
 					m_texture = new Bitmap( path );
-					m_texture.RotateFlip( RotateFlipType.RotateNoneFlipY );
+					//m_texture.RotateFlip( RotateFlipType.RotateNoneFlipY );
 				}
 
 				double w = m_texture.Width;
@@ -1809,7 +1919,7 @@
 				// Scale v so that the image will cover the f.d.
 				double s = 1.0 / ((settings.Verts[0].Abs() + 1) / 2);
 				//s *= 2.3;
-				s *= 1.2;
+				s *= 1.7;
 				v *= s;
 
 				// Get the pixel coords.
@@ -1835,12 +1945,22 @@
 					return Color.FromArgb( 255, 0, 0, 0 );
 
 				Color result = m_texture.GetPixel( (int)x, (int)y );
+				return result;
 				double lOff = 0.0;
 				if( reflections % 2 == 0 )
 					// result = ColorUtil.AvgColorSquare( new List<Color>( new Color[] { result, ColorTranslator.FromHtml( "#2a3132" ) } ) );
 					result = ColorUtil.AdjustL( result, result.GetBrightness() - lOff );
 				else
 					result = ColorUtil.AdjustL( result, result.GetBrightness() + lOff );
+
+				{
+					int incrementsUntilRepeat = 5;
+					int count = flips[2] % incrementsUntilRepeat;
+
+					result = ColorUtil.AdjustS( result, 0.5 );
+					result = ColorUtil.AdjustH( result, 360.0 * count / incrementsUntilRepeat );
+				}
+
 				return result;
 			}
 		}

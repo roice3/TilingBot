@@ -285,7 +285,7 @@
 			settings.Dual = RandBoolWeighted( rand, .2 );
 
 			settings.EdgeWidth = RandDouble( rand, 0, .05 );
-			settings.VertexWidth = RandDouble( rand, 0, .075 );
+			settings.VertexWidth = RandDouble( rand, 0, .1 );
 
 			int centering = 1 + RandIntWeighted( rand, new int[] { 40, 10, 10, 10, 10 } );
 			switch( centering )
@@ -351,7 +351,7 @@
 				}
 			case Geometry.Hyperbolic:
 				{
-					int model = 1 + RandIntWeighted( rand, new int[] { 30, 20, 20, 20, 10, 20, 15, 15 } );
+					int model = 1 + RandIntWeighted( rand, new int[] { 50, 30, 20, 20, 10, 20, 15, 15 } );
 					if( model == 2 )
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
@@ -387,7 +387,7 @@
 		internal static void StandardInputs( Tiler.Settings settings )
 		{
 			settings.Antialias = Test.IsTesting ? false : true;
-			int size = Test.IsTesting ? 900 : 1200;// 4800;
+			int size = Test.IsTesting ? 500 : 1200;
 			settings.Width = size;
 			settings.Height = size;
 
@@ -440,6 +440,10 @@
 				else if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
 					settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
 					settings.Bounds = 5;
+				else if( settings.HyperbolicModel == HyperbolicModel.Azimuthal_Equidistant )
+					settings.Bounds = 4;
+				else if( settings.HyperbolicModel == HyperbolicModel.Azimuthal_EqualArea )
+					settings.Bounds = 3;
 				else if( settings.HyperbolicModel == HyperbolicModel.Joukowsky )
 					settings.Bounds = 1.5;
 				break;
