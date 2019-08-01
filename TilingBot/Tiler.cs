@@ -1782,7 +1782,7 @@
 			{
 				int incrementsUntilRepeat = 40; //30;
 				int offset = 4; //18;
-				if( settings.ColoringData.Length == 3 )
+				if( settings.ColoringData != null && settings.ColoringData.Length == 3 )
 				{
 					incrementsUntilRepeat = settings.ColoringData[1];
 					offset = settings.ColoringData[2];
