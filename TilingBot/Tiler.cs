@@ -1749,7 +1749,7 @@
 		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, int[] allFlips, bool hexagonColoring = false )
 		{
 			int reflections = flips.Sum();
-			bool useStandardColors = ColoringData( settings, 0 ) == 0;
+			bool useStandardColors = ColoringData( settings, 0 ) == 0 || ( settings.IsGoldberg || settings.IsGeodesicDomeAnalogue );
 
 			List<Color> colors = new List<Color>();
 			foreach( var edgeInfo in settings.UniformEdges )

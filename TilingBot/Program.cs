@@ -351,7 +351,7 @@
 				}
 			case Geometry.Hyperbolic:
 				{
-					int model = 1 + RandIntWeighted( rand, new int[] { 50, 30, 20, 20, 10, 20, 15, 15 } );
+					int model = 1 + RandIntWeighted( rand, new int[] { 50, 30, 20, 20, 10, 20, 15, 15, 5, 20, 10 } );
 					if( model == 2 )
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
@@ -366,6 +366,12 @@
 						settings.HyperbolicModel = HyperbolicModel.InvertedPoincare;
 					if( model == 8 )
 						settings.HyperbolicModel = HyperbolicModel.Joukowsky;
+					if( model == 10 )
+						settings.HyperbolicModel = HyperbolicModel.Ring;
+					if( model == 11 )
+						settings.HyperbolicModel = HyperbolicModel.Azimuthal_Equidistant;
+					if( model == 12 )
+						settings.HyperbolicModel = HyperbolicModel.Azimuthal_EqualArea;
 					break;
 				}
 			}

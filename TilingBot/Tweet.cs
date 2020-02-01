@@ -330,6 +330,12 @@
 					case HyperbolicModel.Ring:
 						model = "ring";
 						break;
+					case HyperbolicModel.Azimuthal_Equidistant:
+						model = "azimuthal equidistant";
+						break;
+					case HyperbolicModel.Azimuthal_EqualArea:
+						model = "azimuthal equal area";
+						break;
 					}
 					break;
 				}
