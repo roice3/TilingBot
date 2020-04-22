@@ -212,7 +212,7 @@
 			return (int)(min + Math.Pow( d, 2.5 ) * 17);
 		}
 
-		private static double RandDouble( Random rand, double low, double high )
+		internal static double RandDouble( Random rand, double low, double high )
 		{
 			double r = rand.NextDouble();
 			return low + r * (high - low);
@@ -260,6 +260,17 @@
 			return m;
 		}
 
+		internal static void RandomizeActive( Tiler.Settings settings, Random rand )
+		{
+			List<int> active = new List<int>();
+			if( RandBool( rand ) ) active.Add( 0 );
+			if( RandBool( rand ) ) active.Add( 1 );
+			if( RandBool( rand ) ) active.Add( 2 );
+			if( active.Count == 0 )
+				active.Add( 0 );
+			settings.Active = active.ToArray();
+		}
+
 		private static void RandomizeInputs( Tiler.Settings settings )
 		{
 			Random rand = new Random();
@@ -275,17 +286,11 @@
 			settings.P = p;
 			settings.Q = q;
 
-			List<int> active = new List<int>();
-			if( RandBool( rand ) ) active.Add( 0 );
-			if( RandBool( rand ) ) active.Add( 1 );
-			if( RandBool( rand ) ) active.Add( 2 );
-			if( active.Count == 0 )
-				active.Add( 0 );
-			settings.Active = active.ToArray();
+			RandomizeActive( settings, rand );
 			settings.Dual = RandBoolWeighted( rand, .2 );
 
-			settings.EdgeWidth = RandDouble( rand, 0, .05 );
-			settings.VertexWidth = RandDouble( rand, 0, .1 );
+			settings.EdgeWidth = RandDouble( rand, 0, .15 );
+			settings.VertexWidth = RandDouble( rand, 0, .3 );
 
 			int centering = 1 + RandIntWeighted( rand, new int[] { 40, 10, 10, 10, 10 } );
 			switch( centering )
@@ -340,14 +345,18 @@
 				}
 			case Geometry.Euclidean:
 				{
-					int model = 1 + RandIntWeighted( rand, new int[] { 30, 10, 10, 10 } );
+					int model = 1 + RandIntWeighted( rand, new int[] { 30, 10, 10, 10, 10, 10 } );
 					if( model == 2 )
 						settings.EuclideanModel = EuclideanModel.Conformal;
 					if( model == 3 )
 						settings.EuclideanModel = EuclideanModel.Disk;
 					if( model == 4 )
 						settings.EuclideanModel = EuclideanModel.UpperHalfPlane;
-					break;
+					if( model == 4 )
+						settings.EuclideanModel = EuclideanModel.Spiral;
+					if( model == 5 )
+						settings.EuclideanModel = EuclideanModel.Loxodromic;
+						break;
 				}
 			case Geometry.Hyperbolic:
 				{
