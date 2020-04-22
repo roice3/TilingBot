@@ -138,9 +138,10 @@
 			public bool Antialias { get; set; }
 
 			/// <summary>
-			/// A rotation of the entire image.
+			/// A rotation/translation of the entire image.
 			/// </summary>
 			public double ImageRot { get; set; }
+			public Vector3D ImageTrans { get; set; }
 
 			public double PeriodBand
 			{
@@ -1135,6 +1136,7 @@
 		private Vector3D ApplyTransformation( Vector3D v )
 		{
 			v.RotateXY( m_settings.ImageRot );
+			v -= m_settings.ImageTrans;
 
 			// Now, apply the model, which depends on the geometry.
 			switch( m_settings.Geometry )
@@ -1252,9 +1254,6 @@
 						v *= mag;
 						break;
 					case HyperbolicModel.Joukowsky:
-						/*double off = 0.25;
-						double amt = m_settings.Anim * 2 * Math.PI;
-						Vector3D cen = new Vector3D( Math.Cos( amt ) * off, Math.Sin( amt ) * off );*/
 						Vector3D cen = new Vector3D();
 						v = HyperbolicModels.JoukowskyToPoincare( v, cen );
 						break;
@@ -1346,6 +1345,7 @@
 			if( DrawLimit( settings ) )
 			{
 				v.RotateXY( settings.ImageRot );
+				v -= settings.ImageTrans;
 				double compare = v.Abs();
 				if( settings.Geometry == Geometry.Euclidean &&
 					settings.EuclideanModel == EuclideanModel.UpperHalfPlane )
@@ -1361,7 +1361,15 @@
 						compare = Math.Max( Math.Abs( v.X ), Math.Abs( v.Y ) );
 					}
 					else if( settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
+					{
 						compare = 1.0 / v.Abs();
+					}
+					/*else if( settings.HyperbolicModel == HyperbolicModel.Joukowsky )
+					{
+						double a = 1.0;
+						double b = m_settings.Anim;
+						compare = Math.Abs( v.X* v.X / ( a * a ) + v.Y * v.Y / ( b * b ) );
+					}*/
 				}
 
 				if( compare > 1.00133 )
