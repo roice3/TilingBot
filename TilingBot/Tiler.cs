@@ -1736,16 +1736,8 @@
 
 			bool lightenEdges = ColoringData( settings, 0 ) > 0;
 
-			List<Vector3D> pointsToTry = new List<Vector3D>();
-			int compare = settings.Dual ? 0 : 1; // This is for better coloring on duals to snubs.
-			if( reflections % 2 == compare && settings.IsSnub )
-			{
-				pointsToTry.Add( settings.Mirrors[0].ReflectPoint( v ) );
-				pointsToTry.Add( settings.Mirrors[1].ReflectPoint( v ) );
-				pointsToTry.Add( settings.Mirrors[2].ReflectPoint( v ) );
-			}
-			else
-				pointsToTry.Add( v );
+			int parity = settings.Dual ? 0 : 1; // This is for better coloring on duals to snubs.
+			Vector3D[] pointsToTry = GetTestPoints( settings, reflections + parity, v );
 
 			List<Color> colors = new List<Color>();
 			bool within = false;
@@ -1788,9 +1780,6 @@
 			return ColorUtil.AvgColorSquare( colors );
 		}
 
-		/// <summary>
-		/// TODO: support snubs
-		/// </summary>
 		private static Color ColorFunc1( Settings settings, Vector3D v, int[] flips, int[] allFlips, bool hexagonColoring = false )
 		{
 			int reflections = flips.Sum();
@@ -1798,10 +1787,11 @@
 
 			List<Color> colors = new List<Color>();
 			foreach( var edgeInfo in settings.UniformEdges )
+			foreach( Vector3D vTest in GetTestPoints( settings, reflections, v ) )
 			{
 				if( useStandardColors )
 				{
-					if( edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor ) )
+					if( edgeInfo.PointWithinDist( settings, vTest, edgeInfo.WidthFactor ) )
 					{
 						colors.Add( edgeInfo.Color );
 					}
@@ -1810,7 +1800,7 @@
 				{
 					for( int i = 0; i < edgeInfo.Edges.Length; i++ )
 					{
-						if( edgeInfo.PointWithinDist( settings, v, i, edgeInfo.WidthFactor ) )
+						if( edgeInfo.PointWithinDist( settings, vTest, i, edgeInfo.WidthFactor ) )
 							colors.Add( settings.Colors[i] );
 					}
 				}
@@ -1865,44 +1855,15 @@
 			frac = Util.Smoothed( layerDouble - layer, 1.0 );
 		}
 
-		private static bool TestColor( int[] flips, int[] allFlips, int layer, int mod )
-		{
-			if( flips[2] != layer )
-				return false;
-
-			if( layer == 1 )
-				return true;
-
-			int count0 = 0, count1 = 0;
-			int layerCount = 0;
-			for( int i=0; i<allFlips.Length; i++ )
-			{
-				if( allFlips[i] == 2 )
-					layerCount++;
-
-				if( !(layerCount == layer-1) )
-					continue;
-
-				if( allFlips[i] == 0 )
-					count0++;
-				if( allFlips[i] == 1 )
-					count1++;
-			}
-
-			return (count1) % 2 == mod;
-		}
-
-		/// <summary>
-		/// TODO: support snubs
-		/// </summary>
 		private static Color ColorFuncIntensity( Settings settings, Vector3D v, int[] flips )
 		{
 			int reflections = flips.Sum();
 
 			double dist = double.MaxValue;
 			foreach( var edgeInfo in settings.UniformEdges )
+			foreach( Vector3D vTest in GetTestPoints( settings, reflections, v ) )
 			{
-				double d = edgeInfo.DistTo( settings, v );
+				double d = edgeInfo.DistTo( settings, vTest );
 				dist = Math.Min( d, dist );
 			}
 
@@ -1924,6 +1885,20 @@
 
 			Color c = settings.Colors[0];
 			return ColorUtil.AdjustL( c, newVal );
+		}
+
+		private static Vector3D[] GetTestPoints( Tiler.Settings settings, int totalReflections, Vector3D v )
+		{
+			List<Vector3D> pointsToTry = new List<Vector3D>();
+			if( totalReflections % 2 == 0 && settings.IsSnub )
+			{
+				pointsToTry.Add( settings.Mirrors[0].ReflectPoint( v ) );
+				pointsToTry.Add( settings.Mirrors[1].ReflectPoint( v ) );
+				pointsToTry.Add( settings.Mirrors[2].ReflectPoint( v ) );
+			}
+			else
+				pointsToTry.Add( v );
+			return pointsToTry.ToArray();
 		}
 
 		private Color ColorFuncPicture( Settings settings, Vector3D v, int[] flips, int[] allFlips )
