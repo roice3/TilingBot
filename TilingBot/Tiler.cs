@@ -65,6 +65,9 @@
 			[DataMember]
 			public int Q;
 
+			/// <summary>
+			/// Order of these... mirrors opposite vertex, edge, and tile
+			/// </summary>
 			[DataMember]
 			public int[] Active { get; set; }
 
@@ -189,7 +192,7 @@
 			public Vector3D StartingPoint { get; set; }
 			public Mobius StartingPointMobius { get; set; }
 
-			public EdgeInfo[] UniformEdges { get; set; }
+			public ElementInfo[] UniformEdges { get; set; }
 
 			private void ResolveSettingDiscrepencies()
 			{
@@ -202,7 +205,7 @@
 				ResolveSettingDiscrepencies();
 				CalcMirrors();
 
-				List<EdgeInfo> ei = new List<EdgeInfo>();
+				List<ElementInfo> ei = new List<ElementInfo>();
 				ei.AddRange( CalcEdges() );
 				if( DualCompound )
 				{
@@ -223,7 +226,7 @@
 				}
 
 				UniformEdges = ei.ToArray();
-				foreach( EdgeInfo e in UniformEdges )
+				foreach( ElementInfo e in UniformEdges )
 					e.PreCalc( this );
 
 				CalcCentering();
@@ -315,21 +318,6 @@
 				Verts = verts;
 			}
 
-			private int[] OtherVerts( int i )
-			{
-				switch( i )
-				{
-				case 0:
-					return new int[] { 1, 2 };
-				case 1:
-					return new int[] { 2, 0 };	// The weird order here is because the first vertex may be at infinity, which can cause issues.
-				case 2:
-					return new int[] { 1, 0 };
-				}
-
-				throw new System.ArgumentException();
-			}
-
 			public bool IsRegular
 			{
 				get
@@ -398,7 +386,7 @@
 				}
 			}
 
-			private EdgeInfo[] CalcEdges()
+			private ElementInfo[] CalcEdges()
 			{
 				Geometry g = Geometry2D.GetGeometry( P, Q );
 
@@ -408,7 +396,7 @@
 				List<int[]> activeSet = new List<int[]>();
 				activeSet.Add( Active );
 
-				List<EdgeInfo> edges = new List<EdgeInfo>();
+				List<ElementInfo> edges = new List<ElementInfo>();
 				foreach( int[] active in activeSet )
 				{
 					if( IsCatalanDual && !IsGoldberg && !Snub )
@@ -417,15 +405,56 @@
 						StartingPoint = starting.Item1;
 						Color color = MixColor( starting.Item2 );
 
+						Func<int, int[]> OtherVerts = i =>
+						{
+							switch( i )
+							{
+								case 0:
+									return new int[] { 1, 2 };
+								case 1:
+									return new int[] { 0, 2 };
+								case 2:
+									return new int[] { 0, 1 };
+							}
+
+							throw new System.ArgumentException();
+						};
+
 						// The edges are just the mirrors in this case.
+						HashSet<Vector3D> vertsToDraw = new HashSet<Vector3D>();
+						int edgesMeetingVert1 = 0;
 						List<H3.Cell.Edge> startingEdges = new List<H3.Cell.Edge>();
 						foreach( int a in active )
 						{
 							int[] other = OtherVerts( a );
-							startingEdges.Add( new H3.Cell.Edge( Verts[other[0]], Verts[other[1]], order: false ) );
+							Vector3D start = Verts[other[0]];
+							Vector3D end = Verts[other[1]];
+							startingEdges.Add( new H3.Cell.Edge( start, end, order: false ) );
+
+							// Don't add if at infinity...
+							vertsToDraw.Add( start );
+							vertsToDraw.Add( end );
+
+							if( a == 0 || a == 2 )
+								edgesMeetingVert1++;
 						}
 
-						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = ColorUtil.Inverse( color ) } );
+						// If we had only a single edge meeting vertex 1, we don't want to draw a vertex there.
+						if( edgesMeetingVert1 == 1 )
+						{
+							vertsToDraw.Remove( Verts[1] );
+						}
+
+						// Don't include ideal verts in the hyperbolic case.
+						if( g == Geometry.Hyperbolic )
+							vertsToDraw.Remove( new Vector3D( 1, 0 ) );
+						
+						edges.Add( new ElementInfo()
+						{
+							Verts = vertsToDraw.ToArray(),
+							Edges = startingEdges.ToArray(),
+							Color = ColorUtil.Inverse( color )
+						} );
 					}
 					else
 					{
@@ -448,7 +477,12 @@
 						}
 
 						Vector3D color = starting.Item2;
-						edges.Add( new EdgeInfo() { Edges = startingEdges.ToArray(), Color = MixColor( color ) } );
+						edges.Add( new ElementInfo()
+						{
+							Verts = new Vector3D[] { startingPoint },
+							Edges = startingEdges.ToArray(),
+							Color = MixColor( color )
+						} );
 
 						HandleGeodesicOrGoldberg( edges, color );
 					}
@@ -457,7 +491,7 @@
 				if( IsSnub )
 				{
 					H3.Cell.Edge[] snubEdges = SnubEdges( this );
-					EdgeInfo ei = new EdgeInfo() { Edges = snubEdges.ToArray(), Color = edges[0].Color };
+					ElementInfo ei = new ElementInfo() { Edges = snubEdges.ToArray(), Color = edges[0].Color };
 					edges.Clear();
 					edges.Add( ei );
 				}
@@ -539,7 +573,7 @@
 				}
 			}
 
-			private void HandleGeodesicOrGoldberg( List<EdgeInfo> edges, Vector3D color )
+			private void HandleGeodesicOrGoldberg( List<ElementInfo> edges, Vector3D color )
 			{
 				if( !IsGeodesicOrGoldberg )
 					return;
@@ -621,7 +655,7 @@
 					}
 				}
 
-				edges.Add( new EdgeInfo() { Edges = gEdges.ToArray(), Color = MixColor( color ), WidthFactor = 0.25 } );
+				edges.Add( new ElementInfo() { Edges = gEdges.ToArray(), Color = MixColor( color ), WidthFactor = 0.25 } );
 			}
 
 			private static H3.Cell.Edge[] SnubEdges( Settings settings )
@@ -872,7 +906,7 @@
 			/// </summary>
 			public int ColorIndexForPoint( Vector3D test )
 			{
-				EdgeInfo ei = UniformEdges.Last();
+				ElementInfo ei = UniformEdges.Last();
 				var edges = ei.Edges;
 
 				// We need to go through the edges in CCW order.
@@ -894,8 +928,9 @@
 			}
 		}
 
-		public class EdgeInfo
+		public class ElementInfo
 		{
+			public Vector3D[] Verts;
 			public H3.Cell.Edge[] Edges;
 			public Color Color;
 			public double WidthFactor = 1.0;
@@ -941,13 +976,22 @@
 
 			public bool PointWithinDist( Settings settings, Vector3D p, int edgeIdx, double widthFactor )
 			{
+				// Check verts first.
+				double vCutoff = settings.VertexWidth * widthFactor;
+				double vCutoffInGeometry = settings.DistInGeometry( new Vector3D( vCutoff, 0 ), new Vector3D() );
+				foreach( Vector3D vert in Verts )
+				{
+					if( settings.DistInGeometry( p, vert ) < vCutoffInGeometry )
+						return true;
+				}
+
 				H3.Cell.Edge e = Edges[edgeIdx];
 				Mobius m = Mobii[edgeIdx];
 				double a = Angles[edgeIdx];
 
 				// Awkward that I made the width values the euclidean value at the origin :( Worth changing?
-				double cutoff = settings.EdgeWidth * widthFactor;
-				double cutoffInGeometry = settings.DistInGeometry( new Vector3D( cutoff, 0 ), new Vector3D() );
+				double eCutoff = settings.EdgeWidth * widthFactor;
+				double eCutoffInGeometry = settings.DistInGeometry( new Vector3D( eCutoff, 0 ), new Vector3D() );
 
 				p = m.Apply( p );
 
@@ -956,14 +1000,10 @@
 				{
 					double eLength = settings.DistInGeometry( e.Start, e.End ) / 2;
 					double compare = settings.DistInGeometry( p, new Vector3D() );
-					if( Math.Abs( eLength - compare ) < cutoffInGeometry )
+					if( Math.Abs( eLength - compare ) < eCutoffInGeometry )
 						return true;
 					return false;
 				}
-
-				// Dots near the starting point.
-				if( p.Abs() < settings.VertexWidth * widthFactor )
-					return true;
 
 				// Same side as endpoint?
 				Vector3D end = m.Apply( e.End );
@@ -972,14 +1012,14 @@
 
 				// Beyond the endpoint?
 				if( p.Abs() > end.Abs() && 
-					settings.DistInGeometry( p, end ) > cutoffInGeometry )
+					settings.DistInGeometry( p, end ) > eCutoffInGeometry )
 					return false;
 
 				p.RotateXY( -a );
 
 				Vector3D cen;
 				double d;
-				H3Models.Ball.DupinCyclideSphere( p, cutoff, settings.Geometry, out cen, out d );
+				H3Models.Ball.DupinCyclideSphere( p, eCutoff, settings.Geometry, out cen, out d );
 				return d > Math.Abs( cen.Y );
 			}
 
@@ -997,6 +1037,13 @@
 
 			public double DistTo( Settings settings, Vector3D p, int edgeIdx )
 			{
+				// Track verts first.
+				double dVerts = double.MaxValue;
+				foreach( Vector3D vert in Verts )
+				{
+					dVerts = Math.Min( dVerts, settings.DistInGeometry( p, vert ) );
+				}
+
 				H3.Cell.Edge e = Edges[edgeIdx];
 				Mobius m = Mobii[edgeIdx];
 				double a = Angles[edgeIdx];
@@ -1033,9 +1080,9 @@
 					dEdge = DonHatch.asinh( DonHatch.sinh( distToP ) * Math.Sin( angleToP ) / Math.Sin( Math.PI / 2 ) );
 				}
 
-				dOrigin /= settings.VertexWidth;
+				dVerts /= settings.VertexWidth;
 				dEdge /= settings.EdgeWidth;
-				return Math.Min( dOrigin, dEdge );
+				return Math.Min( dVerts, dEdge );
 			}
 
 			public double AngleTo( Geometry g, Vector3D p, int edgeIdx )
