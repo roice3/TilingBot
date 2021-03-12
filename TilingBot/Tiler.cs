@@ -491,7 +491,10 @@
 				if( IsSnub )
 				{
 					H3.Cell.Edge[] snubEdges = SnubEdges( this );
-					ElementInfo ei = new ElementInfo() { Edges = snubEdges.ToArray(), Color = edges[0].Color };
+					ElementInfo ei = new ElementInfo() {
+						Verts = snubEdges.Select( e => e.Start ).ToArray(),
+						Edges = snubEdges.ToArray(),
+						Color = edges[0].Color };
 					edges.Clear();
 					edges.Add( ei );
 				}
@@ -655,7 +658,13 @@
 					}
 				}
 
-				edges.Add( new ElementInfo() { Edges = gEdges.ToArray(), Color = MixColor( color ), WidthFactor = 0.25 } );
+				edges.Add( new ElementInfo()
+				{
+					Verts = gEdges.Select( e => e.Start ).ToArray(),
+					Edges = gEdges.ToArray(),
+					Color = MixColor( color ),
+					WidthFactor = 0.25
+				} );
 			}
 
 			private static H3.Cell.Edge[] SnubEdges( Settings settings )
