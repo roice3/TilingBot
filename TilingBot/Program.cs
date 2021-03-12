@@ -413,67 +413,72 @@
 			if( settings.Bounds == 0 )
 				SetStandardBounds( settings );
 
+			SetSpecialAspectRatios( settings );
+
 			settings.Init();
+		}
+
+		internal static void SetSpecialAspectRatios( Tiler.Settings settings )
+		{
+			switch( settings.Geometry )
+			{
+			case Geometry.Spherical:
+				if( settings.SphericalModel == SphericalModel.Equirectangular ||
+							settings.SphericalModel == SphericalModel.Sinusoidal )
+				{
+					settings.Height = (int)( settings.Height * 2.0 / 3 );
+					settings.Width = (int)( settings.Width * 4.0 / 3 );
+				}
+				break;
+			case Geometry.Euclidean:
+				break;
+			case Geometry.Hyperbolic:
+				if( settings.HyperbolicModel == HyperbolicModel.Band )
+				{
+					double factor = 1.5;
+					settings.Height = (int)( settings.Height / factor );
+					settings.Width = (int)( settings.Width * factor );
+				}
+				break;
+			}
 		}
 
 		internal static void SetStandardBounds( Tiler.Settings settings )
 		{
+			// Default if not otherwise specified.
 			double diskBounds = 1.01;
+			settings.Bounds = diskBounds;
+
 			switch( settings.Geometry )
 			{
-				case Geometry.Spherical:
-					if( settings.SphericalModel == SphericalModel.Sterographic )
-						settings.Bounds = 6.5;
-					else if( settings.SphericalModel == SphericalModel.Equirectangular ||
-							 settings.SphericalModel == SphericalModel.Sinusoidal )
-					{
-						settings.Bounds = 1;
-						if( settings.SphericalModel == SphericalModel.Sinusoidal )
-							settings.Bounds = 1.01;
-						settings.Height = (int)( settings.Height * 2.0 / 3 );
-						settings.Width = (int)( settings.Width * 4.0 / 3 );
-					}
-					else if( settings.SphericalModel == SphericalModel.Mercator )
-					{
-						settings.Bounds = 1;
-					}
-					else if( settings.SphericalModel == SphericalModel.Azimuthal_Equidistant ||
-						settings.SphericalModel == SphericalModel.Azimuthal_EqualArea ||
-						settings.SphericalModel == SphericalModel.Orthographic )
-					{
-						settings.Bounds = diskBounds;
-					}
-					else if( settings.SphericalModel == SphericalModel.PeirceQuincuncial )
-						settings.Bounds = 4;
-					else
-						settings.Bounds = 2;
-					break;
-				case Geometry.Euclidean:
-					if( settings.EuclideanModel == EuclideanModel.Isometric ||
-						settings.EuclideanModel == EuclideanModel.Spiral ||
-						settings.EuclideanModel == EuclideanModel.Loxodromic )
-						settings.Bounds = 2;
-					else
-						settings.Bounds = diskBounds;
-					break;
-				case Geometry.Hyperbolic:
-					settings.Bounds = diskBounds;
-					if( settings.HyperbolicModel == HyperbolicModel.Band )
-					{
-						double factor = 1.5;
-						settings.Height = (int)( settings.Height / factor );
-						settings.Width = (int)( settings.Width * factor );
-					}
-					else if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
-						settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
-						settings.Bounds = 5;
-					else if( settings.HyperbolicModel == HyperbolicModel.Azimuthal_Equidistant )
-						settings.Bounds = 4;
-					else if( settings.HyperbolicModel == HyperbolicModel.Azimuthal_EqualArea )
-						settings.Bounds = 3;
-					else if( settings.HyperbolicModel == HyperbolicModel.Joukowsky )
-						settings.Bounds = 1.5;
-					break;
+			case Geometry.Spherical:
+				if( settings.SphericalModel == SphericalModel.Sterographic )
+					settings.Bounds = 6.5;
+				else if( settings.SphericalModel == SphericalModel.Equirectangular ||
+						 settings.SphericalModel == SphericalModel.Mercator )
+				{
+					settings.Bounds = 1;
+				}
+				else if( settings.SphericalModel == SphericalModel.PeirceQuincuncial )
+					settings.Bounds = 4;
+				break;
+			case Geometry.Euclidean:
+				if( settings.EuclideanModel == EuclideanModel.Isometric ||
+					settings.EuclideanModel == EuclideanModel.Spiral ||
+					settings.EuclideanModel == EuclideanModel.Loxodromic )
+					settings.Bounds = 2;
+				break;
+			case Geometry.Hyperbolic:
+				if( settings.HyperbolicModel == HyperbolicModel.Orthographic ||
+					settings.HyperbolicModel == HyperbolicModel.InvertedPoincare )
+					settings.Bounds = 5;
+				else if( settings.HyperbolicModel == HyperbolicModel.Azimuthal_Equidistant )
+					settings.Bounds = 4;
+				else if( settings.HyperbolicModel == HyperbolicModel.Azimuthal_EqualArea )
+					settings.Bounds = 3;
+				else if( settings.HyperbolicModel == HyperbolicModel.Joukowsky )
+					settings.Bounds = 1.5;
+				break;
 			}
 		}
 
