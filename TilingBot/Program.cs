@@ -209,7 +209,7 @@
 			// Weight smaller values more.
 			double d = rand.NextDouble();
 			int min = 3;
-			return (int)(min + Math.Pow( d, 2.5 ) * 17);
+			return (int)(min + Math.Pow( d, 2.5 ) * 20);
 		}
 
 		internal static double RandDouble( Random rand, double low, double high )
@@ -278,7 +278,7 @@
 			int p = RandPQ( rand );
 			int q = RandPQ( rand );
 			if( q > 18 )
-				q = -1; // Make q infinite 10% of the time.
+				q = -1; // Make q infinite
 
 			// ZZZ - Pick certain geometries some percentage of the time.
 			// Otherwise, we tend to overwhelmingly get hyperbolic tilings.
@@ -288,9 +288,12 @@
 
 			RandomizeActive( settings, rand );
 			settings.Dual = RandBoolWeighted( rand, .2 );
+			settings.Snub = RandBoolWeighted( rand, .1 );
+			if( settings.Snub )
+				settings.Active = new int[] { 0, 1, 2 };
 
-			settings.EdgeWidth = RandDouble( rand, 0, .15 );
-			settings.VertexWidth = RandDouble( rand, 0, .3 );
+			settings.EdgeWidth = RandDouble( rand, 0, .05 );
+			settings.VertexWidth = RandDouble( rand, 0, .1 );
 
 			int centering = 1 + RandIntWeighted( rand, new int[] { 40, 10, 10, 10, 10 } );
 			switch( centering )
@@ -352,15 +355,15 @@
 						settings.EuclideanModel = EuclideanModel.Disk;
 					if( model == 4 )
 						settings.EuclideanModel = EuclideanModel.UpperHalfPlane;
-					if( model == 4 )
-						settings.EuclideanModel = EuclideanModel.Spiral;
 					if( model == 5 )
+						settings.EuclideanModel = EuclideanModel.Spiral;
+					if( model == 6 )
 						settings.EuclideanModel = EuclideanModel.Loxodromic;
 						break;
 				}
 			case Geometry.Hyperbolic:
 				{
-					int model = 1 + RandIntWeighted( rand, new int[] { 50, 30, 20, 20, 10, 20, 15, 15, 5, 20, 10 } );
+					int model = 1 + RandIntWeighted( rand, new int[] { 50, 30, 20, 40, 10, 30, 15, 15, 5, 20, 10 } );
 					if( model == 2 )
 						settings.HyperbolicModel = HyperbolicModel.Klein;
 					if( model == 3 )
@@ -375,11 +378,11 @@
 						settings.HyperbolicModel = HyperbolicModel.InvertedPoincare;
 					if( model == 8 )
 						settings.HyperbolicModel = HyperbolicModel.Joukowsky;
-					if( model == 10 )
+					if( model == 9 )
 						settings.HyperbolicModel = HyperbolicModel.Ring;
-					if( model == 11 )
+					if( model == 10 )
 						settings.HyperbolicModel = HyperbolicModel.Azimuthal_Equidistant;
-					if( model == 12 )
+					if( model == 11 )
 						settings.HyperbolicModel = HyperbolicModel.Azimuthal_EqualArea;
 					break;
 				}
@@ -394,7 +397,7 @@
 			for( int i = 0; i < 5; i++ )
 				colors.Add( RandColor( rand ) );
 			settings.Colors = colors.ToArray();
-			settings.ColoringOption = RandIntWeighted( rand, new int[] { 10, 20, 30, 10 } );
+			settings.ColoringOption = RandIntWeighted( rand, new int[] { 10, 30, 10, 5 } );
 			if( RandBool( rand ) )
 				settings.ColoringData = new int[] { 1 };
 		}
