@@ -282,10 +282,6 @@
 
 				Polygon baseTile = new Polygon();
 				baseTile.CreateRegular( P, Q );
-				//double q = 4.0 / ( P - 2 ) + 2;	// Make Euclidean.
-				//baseTile.CreateRegular( P, q );
-				//double pow = ( this.Anim + 0.5 ) * 2;
-				//baseTile.CreateRegular( P, Math.Pow( 3, pow ) );
 				Segment seg = baseTile.Segments[0];
 
 				// Order needs to match mirrors.
@@ -1057,12 +1053,39 @@
 
 		Settings m_settings;
 
+		private void DrawCircle( Bitmap image, Settings settings )
+		{
+			double b = settings.Bounds;
+			ImageSpace i = new ImageSpace( settings.Width, settings.Height );
+			i.XMin = -b; i.XMax = b;
+			i.YMin = -b; i.YMax = b;
+
+			Vector3D cen = new Vector3D();
+			cen = settings.Verts[0];
+			cen.RotateXY( Math.PI / 2 );
+			/*cen = settings.Mirrors[2].ReflectPoint( cen );
+			cen.RotateXY( Math.PI );
+			cen = settings.Mirrors[2].ReflectPoint( cen );
+			cen.RotateXY( Math.PI / 4 );*/
+			double r = ( cen.Y + 1 ) / 2;
+			cen.Y = cen.Y - r;
+			Circle circ = new Circle { Center = cen, Radius = r };
+
+			float scale = 1;
+			using( Graphics g = Graphics.FromImage( image ) )
+			using( Pen p = new Pen( Color.Blue, scale * 3.0f ) )
+			{
+				DrawUtils.DrawCircle( circ, g, i, p );
+			}
+		}
+
 		public void GenImage( Settings settings )
 		{
 			m_settings = settings;
 			int width = settings.Width;
 			int height = settings.Height;
 			Bitmap image = new Bitmap( width, height );
+			//DrawCircle( image, settings );
 
 			// Cycle through all the pixels and calculate the color.
 			int row = 0;
@@ -1125,8 +1148,19 @@
 				}
 			} );
 
+			//DrawCircle( image, settings );
 			image.RotateFlip( RotateFlipType.RotateNoneFlipY );
 			image.Save( settings.FileName, ImageFormat.Png );
+		}
+
+		private Vector3D ApplyAnimTransform( Vector3D v, double t )
+		{
+			Vector3D onSphere = Sterographic.PlaneToSphere( v );
+			if( onSphere.Z >= t )
+				return v * 10000;
+			onSphere.Z += 1.0;
+			v = onSphere.CentralProject( 1.0 + t );
+			return v;
 		}
 
 		/// <summary>
@@ -1179,6 +1213,7 @@
 					switch( m_settings.EuclideanModel )
 					{
 					case EuclideanModel.Isometric:
+						break;
 					case EuclideanModel.Conformal:
 						break;
 					case EuclideanModel.Disk:
@@ -1573,7 +1608,7 @@
 				}
 			}
 
-			System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
+			//System.Console.WriteLine( string.Format( "Did not converge at point {0}", original.ToString() ) );
 			return false;
 		}
 
@@ -1681,6 +1716,17 @@
 			return settings.ColoringData[idx];
 		}
 
+		private static void Darken( List<Color> c )
+		{
+			for( int i = 0; i < 2; i++ )
+				c.Add( ColorTranslator.FromHtml( "#2a3132" ) );
+		}
+
+		private static void Lighten( List<Color> c )
+		{
+			c.Add( Color.White );
+		}
+
 		/// <summary>
 		/// TODO: custom edge coloring
 		/// </summary>
@@ -1689,15 +1735,6 @@
 			int reflections = flips.Sum();
 
 			bool lightenEdges = ColoringData( settings, 0 ) > 0;
-			System.Action<List<Color>> darken = new System.Action<List<Color>>( c =>
-			{
-				for( int i = 0; i < 2; i++ )
-					c.Add( ColorTranslator.FromHtml( "#2a3132" ) );
-			} );
-			System.Action<List<Color>> lighten = new System.Action<List<Color>>( c =>
-			{
-				c.Add( Color.White );
-			} );
 
 			List<Vector3D> pointsToTry = new List<Vector3D>();
 			int compare = settings.Dual ? 0 : 1; // This is for better coloring on duals to snubs.
@@ -1720,9 +1757,9 @@
 					if( tWithin )
 					{
 						if( lightenEdges )
-							lighten( colors );
+							Lighten( colors );
 						else
-							darken( colors );
+							Darken( colors );
 
 						within = true;
 						break;
@@ -1743,9 +1780,9 @@
 			{
 				// Do the opposite of what we did for edges.
 				if( lightenEdges )
-					darken( colors );
+					Darken( colors );
 				else
-					lighten( colors );
+					Lighten( colors );
 			}
 
 			return ColorUtil.AvgColorSquare( colors );
@@ -1765,7 +1802,9 @@
 				if( useStandardColors )
 				{
 					if( edgeInfo.PointWithinDist( settings, v, edgeInfo.WidthFactor ) )
+					{
 						colors.Add( edgeInfo.Color );
+					}
 				}
 				else
 				{
@@ -1777,15 +1816,9 @@
 				}
 			}
 
-			/*int layer, mod;
-			double frac;
-			GetAnimParams( settings, out layer, out mod, out frac );
-			int layer = 2, mod = 0;
-			whitish = TestColor( flips, allFlips, layer, mod ) ? settings.Colors[1] : whitish;
-			Color whitish = Color.FromArgb( 0, 0, 0, 0 );*/
-
 			Color whitish = ColorTranslator.FromHtml( "#F1F1F2" );
 			Color darkish = ColorTranslator.FromHtml( "#BCBABE" );
+
 			if( hexagonColoring )
 			{
 				int incrementsUntilRepeat = 40; //30;
@@ -1810,7 +1843,7 @@
 				return whitish;
 
 			return reflections % 2 == 0 ? whitish : darkish;
-			//return flips[2] % 2 == 0 ? Color.Black : Color.White;	// Checkerboard
+			//return flips[0] % 2 == 0 ? Color.Black : Color.White;	// Checkerboard
 		}
 
 		private static void GetAnimParams( Settings settings, out int layer, out int mod, out double frac )

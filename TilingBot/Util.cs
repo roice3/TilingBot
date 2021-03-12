@@ -59,9 +59,20 @@
 			throw new System.ArgumentException();
 		}
 
-		public static double Smoothed( double input, double max )
+		public static double Interp( double frac, double start, double end )
 		{
-			return (max / 2.0) * (-Math.Cos( Math.PI * input ) + 1);
+			return start + ( end - start ) * frac;
+		}
+
+		public static double Smoothed( double frac, double start, double end )
+		{
+			double newFrac = Smoothed( frac, 1.0 );
+			return Interp( newFrac, start, end );
+		}
+
+		public static double Smoothed( double frac, double max )
+		{
+			return (max / 2.0) * (-Math.Cos( Math.PI * frac ) + 1);
 		}
 
 		/// <summary>
