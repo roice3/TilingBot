@@ -57,6 +57,7 @@
 				ColoringOption = 0;
 				GeodesicLevels = 0;
 				RingRepeats = 5;
+				SchwarzChristoffelPolygon = 3;
 			}
 
 			[DataMember]
@@ -90,6 +91,9 @@
 
 			[DataMember]
 			public int RingRepeats { get; set; }
+
+			[DataMember]
+			public int SchwarzChristoffelPolygon { get; set; }
 
 			[DataMember]
 			public double EdgeWidth { get; set; }
@@ -1357,7 +1361,11 @@
 					case HyperbolicModel.Azimuthal_EqualArea:
 						v = HyperbolicModels.EqualAreaToPoincare( v );
 						break;
-					}
+					case HyperbolicModel.Schwarz_Christoffel:
+						v = Vector3D.FromComplex( 
+							Schwarz_Christoffel.inversesc( v.ToComplex(), m_settings.SchwarzChristoffelPolygon ) );
+						break;
+						}
 					break;
 				}
 			}
@@ -1429,6 +1437,21 @@
 				if( v.Abs() < v1.Abs() || v.Abs() > v2.Abs() )
 				{
 					color = bgColor;
+					return true;
+				}
+			}
+
+			if( settings.Geometry == Geometry.Hyperbolic &&
+				settings.HyperbolicModel == HyperbolicModel.Schwarz_Christoffel )
+			{
+				Polygon poly = Polygon.CreateEuclidean( settings.SchwarzChristoffelPolygon );
+				if( !poly.IsPointInside( v ) )
+				{
+					poly.Scale( 1.00133 );
+					if( !poly.IsPointInside( v ) )
+						color = bgColor;
+					else
+						color = Color.Black;
 					return true;
 				}
 			}

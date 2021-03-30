@@ -118,17 +118,6 @@
 			return SquareToPoincare( p );
 		}
 
-		/// <summary>
-		/// https://www.physicsforums.com/threads/conformal-map-for-regular-polygon-in-circle.89759/
-		/// https://math.stackexchange.com/questions/1528270/numerical-libraries-and-special-function-of-complex-parameters/1528299#1528299
-		/// </summary>
-		public static Complex PolygonToPoincare( Vector3D p )
-		{
-			//z( 1 - z ^ m ) ^ ( 2 / m )( -1 + z ^ m ) ^ ( -2 / m ) Hypergeometric2F1[1 / m, 2 / m, 1 + 1 / m, z ^ m]
-			//AdvancedMath.Hypergeometric2F1( )
-			throw new System.NotImplementedException();
-		}
-
 		//
 		// Hyperbolic utility functions.
 		// ZZZ - Move to shared location.
