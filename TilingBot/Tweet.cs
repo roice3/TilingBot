@@ -4,7 +4,6 @@
 	using R3.Core;
 	using R3.Geometry;
 	using System;
-	using System.Collections.Generic;
 	using System.IO;
 	using System.Linq;
 	using System.Threading.Tasks;
@@ -336,12 +335,34 @@
 					case HyperbolicModel.Azimuthal_EqualArea:
 						model = "azimuthal equal area";
 						break;
+					case HyperbolicModel.Schwarz_Christoffel:
+						prefix = postfix = string.Empty;
+						string poly = PolygonString( settings.SchwarzChristoffelPolygon );
+						model = $"a conformal {poly}";
+						break;
 					}
 					break;
 				}
 			}
 
 			return prefix + model + postfix;
+		}
+
+		private static string PolygonString( int n )
+		{
+			switch( n )
+			{
+				case 2: return "digon";
+				case 3: return "triangle";
+				case 4: return "square";
+				case 5: return "pentagon";
+				case 6: return "hexagon";
+				case 7: return "heptagon";
+				case 8: return "octagon";
+				case 9: return "nonagon";
+				case 10: return "decagon";
+				default: return "polygon";
+			}
 		}
 
 		private static string UniformDesc( Tiler.Settings settings, bool addParenthesis = true )
