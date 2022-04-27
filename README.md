@@ -8,8 +8,10 @@ https://twitter.com/tilingbot
 https://twitter.com/roice713  
 http://roice3.org/
 
-# Dependencies
+## [FAQ](https://raw.githubusercontent.com/roice3/TilingBot/master/FAQ.md)
 
-This currently uses the R3.Core library from my HyperbolicModels project. If you want to build, you'll need to sync and build that repo as well.
+## Dependencies
+
+This currently uses the R3.Core library from my HyperbolicModels project. If you want to build, you'll need to pull and build that repo as well.
 
 It also uses LinqToTwitter as a NuGet package, so that should just work.
