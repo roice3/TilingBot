@@ -5,7 +5,6 @@ I most often get a flavor of this comment/question...
 * I want to learn more about this!
 * Can you teach me how this is generated?
 * What resources can I use to learn about non-Euclidean geometry?
-<br/>
 
 ## Intro
 
@@ -29,6 +28,7 @@ I've seen two main approaches to coding hyperbolic tilings, each with advantages
 ## Books: Hyperbolic Geometry
 
 [Visual Complex Analysis](https://amzn.to/2Xg9vPA), by Tristan Needham
+
 This is a bit of a commitment but I also can't recommend the book enough. The first six chapters give a good foundation for non-Euclidean geometry. It is not coding oriented, but it would provide all the mathematics necessary to get started. It's how I first started learning about the geometry, the models, Mobius transformations, etc.
 <br/>
 
