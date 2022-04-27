@@ -8,7 +8,7 @@ https://twitter.com/tilingbot
 https://twitter.com/roice713  
 http://roice3.org/
 
-## [FAQ](https://raw.githubusercontent.com/roice3/TilingBot/master/FAQ.md)
+## [FAQ](https://github.com/roice3/TilingBot/blob/master/FAQ.md)
 
 ## Dependencies
 
