@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26403.7
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32210.238
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TilingBot", "TilingBot.csproj", "{C83DDAF0-AD95-4D0C-BDD8-27AAF2991239}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "R3.Core", "..\..\Honeycombs\code\R3\R3.Core\R3.Core.csproj", "{8D56AB30-6E10-4D66-B10E-0DCC4A0F4051}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "R3.Core", "..\R3.Core\R3.Core.csproj", "{8D56AB30-6E10-4D66-B10E-0DCC4A0F4051}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,5 +24,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C79FE67D-26A9-42D3-A857-9F022FBB1E72}
 	EndGlobalSection
 EndGlobal

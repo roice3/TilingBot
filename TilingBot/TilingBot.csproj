@@ -83,7 +83,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Honeycombs\code\R3\R3.Core\R3.Core.csproj">
+    <ProjectReference Include="..\R3.Core\R3.Core.csproj">
       <Project>{8d56ab30-6e10-4d66-b10e-0dcc4a0f4051}</Project>
       <Name>R3.Core</Name>
     </ProjectReference>
