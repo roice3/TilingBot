@@ -9,6 +9,18 @@ Determines the [P,Q] symmetry group. For a regular {P,Q} tiling, this means we h
 The choice of this will determine the geometry, depending on the value of (P-2)*(Q-2).
 </dd>
 
+<dt><b>Centering</b></dt>
+<dd>
+Controls how the tiling is centered.<br />
+<ul>
+<li>General (controlled by the Mobius property)</li>
+<li>Fundamental_Triangle_Vertex1</li>
+<li>Fundamental_Triangle_Vertex2</li>
+<li>Fundamental_Triangle_Vertex3</li>
+<li>Vertex (centers on the generating vertex)</li>
+</ul>
+</dd>
+
 <dt><b>ColoringOption</b></dt>
 <dd>
 An integer, which determines some main approaches for coloring.<br />

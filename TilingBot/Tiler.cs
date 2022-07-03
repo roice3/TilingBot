@@ -27,7 +27,7 @@
 			Fundamental_Triangle_Vertex1,
 			Fundamental_Triangle_Vertex2,
 			Fundamental_Triangle_Vertex3,
-			Vertex,	// For a vertex-transitive tiling
+			Vertex,	// Centers on the generating vertex
 		}
 
 		[DataContract( Namespace = "" )]
