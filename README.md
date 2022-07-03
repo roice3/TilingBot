@@ -10,6 +10,8 @@ http://roice3.org/
 
 ## [FAQ](https://github.com/roice3/TilingBot/blob/master/FAQ.md)
 
+## [Format](https://github.com/roice3/TilingBot/blob/master/Format.md)
+
 ## Dependencies
 
-LinqToTwitter (NuGet package, so should just work).
+LinqToTwitter.
