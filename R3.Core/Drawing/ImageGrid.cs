@@ -47,12 +47,13 @@
 			Graphics g = Graphics.FromImage( image );
 			g.Clear( Color.Black );
 
-			int tileWidth = 300;//s.Width / s.Columns;
-			int tileHeight = 300;// s.Height / s.Rows;
+			int tileWidth = s.Width / s.Columns;
+			int tileHeight = s.Height / s.Rows;
 			int vGap = s.vGap, hGap = s.hGap;
 			Size tileSize = new Size( tileWidth, tileHeight );
 
 			int currentRow = 0, currentCol = 0;
+			currentRow = s.Rows - 1;
 			foreach( string imageName in s.InputImages )
 			{
 				string fullFileName = Path.Combine( s.Directory, imageName );
@@ -72,6 +73,7 @@
 				original.Dispose();
 				tile.Dispose();
 
+				/*
 				currentCol++;
 				if( currentCol >= s.Columns )
 				{
@@ -79,6 +81,15 @@
 					currentRow++;
 				}
 				if( currentRow >= s.Rows )
+					break;
+				*/
+				currentCol++;
+				if( currentCol >= s.Columns )
+				{
+					currentCol = 0;
+					currentRow--;
+				}
+				if( currentRow < 0 )
 					break;
 			}
 

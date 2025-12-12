@@ -19,7 +19,8 @@
 		Ring,
 		Azimuthal_Equidistant,
 		Azimuthal_EqualArea,
-		Schwarz_Christoffel
+		Schwarz_Christoffel,
+        Parabola,
 	}
 
 	public class HyperbolicModels
@@ -92,6 +93,73 @@
 			v = UpperInv.Apply( v );
 			return v;
 		}
+
+		public static Vector3D MinkowskiPlaneToPoincare( Vector3D v )
+		{
+			// First we transform from our plane to a 45 degree plane (the parabola),
+			// Then we can use our other formula.
+
+
+
+			return ParabolaToPoincare( v );
+		}
+
+		public static Vector3D ParabolaToPoincare( Vector3D v )
+		{
+			// p279 from Conformal Mapping book
+			// gives a parabola -> disk formula
+			Complex z = v.ToComplex();
+			Complex w = Complex.Pow( Complex.Tan( Complex.Sqrt( z ) ), 2 );
+			return Vector3D.FromComplex( w );
+		}
+
+		public static Vector3D ParabolaToPoincareNan( Vector3D v )
+        {
+            /* First parabola (45 degree plane) to hyperboloid.
+               From Nan's email:
+
+            for unknowns x, y, z, we get (with the help of Mathematica):
+
+            x = (Sqrt[2] px + px^2)/(sqrt(2) px +1 - py^2)
+            y = (2 py + Sqrt[2] px py)/(sqrt(2) px +1 - py^2)
+            z = 1 + (px^2 + 2 py^2)/(sqrt(2) px + 1 - py^2)
+            */
+
+            double px = v.Y;
+            double py = v.X;
+            double s2 = Math.Sqrt(2);
+            double denom = s2 * px + 1 - py * py;
+            Vector3D hPoint = new Vector3D(
+                (s2 * px + px * px) / denom,
+                (2 * py + s2 * px * py) / denom,
+                1 + (px * px + 2 * py * py) / denom);
+
+            // Now from hyperboloid to disk.
+            return Sterographic.HyperboloidToPlane(hPoint);
+        }
+
+		public static Vector3D InsideParabolaToPoincare( Vector3D v )
+		{
+			throw new NotImplementedException();
+		}
+
+        public static Vector3D OutsideParabolaToPoincare( Vector3D v )
+        {
+            // First parabola to half.
+            Complex z = v.ToComplex();
+            Complex i = Complex.ImaginaryOne;
+            //z = ( z * z - 1 ) / ( i * 4 );
+            z = Complex.Sqrt(Complex.One + i * 4 * z);
+
+            // Now from half to disk.
+            Mobius halfToDisk = new Mobius();
+            halfToDisk.MapPoints(
+                Complex.One, new Complex(1, 10), Infinity.InfinityComplex,
+                Complex.One, -Complex.ImaginaryOne, -Complex.One );
+            v = halfToDisk.Apply(Vector3D.FromComplex(z));
+            //v = Vector3D.FromComplex(z);
+            return v;
+        }
 
 		public static Vector3D PoincareToOrtho( Vector3D v )
 		{
@@ -190,9 +258,9 @@
 			}
 
 			return Vector3D.FromComplex( w );*/
-		}
+        }
 
-		public static Vector3D EquidistantToPoincare( Vector3D p )
+        public static Vector3D EquidistantToPoincare( Vector3D p )
 		{
 			Vector3D result = p;
 			result.Normalize();

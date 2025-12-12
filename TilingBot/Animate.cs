@@ -1,6 +1,5 @@
 ﻿namespace TilingBot
 {
-	using LinqToTwitter;
 	using R3.Core;
 	using R3.Drawing;
 	using R3.Geometry;
@@ -20,16 +19,16 @@
 		{
 			Tiler.Settings settings = Program.GenSettings( tweeting: false );
 			//settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2019-1-17_23-08-44.xml" ) );
-			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "2019-3-18_21-49-38.xml" ) );
+			settings = Persistence.LoadSettings( Path.Combine( Persistence.WorkingDir, "final.xml" ) );
 			// Make custom setting edits here.
 			//settings.VertexWidth = 0.0;
-			settings.P = 4;
-			settings.Q = 8;
-			settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex1;
-			Mobius mOrig = settings.Mobius;
+			//settings.P = 4;
+			//settings.Q = 8;
+			//settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex1;
+			//Mobius mOrig = settings.Mobius;
 			Program.StandardInputs( settings );
 
-			int numFrames = Test.IsTesting ? 20 : 180;
+			int numFrames = Test.IsTesting ? 40 : 900;
 
 			Vector3D pStart = new Vector3D();
 			//Vector3D pEnd = new Vector3D( 0, OffsetInModel( settings, 2, 0, 0 ) );
@@ -105,7 +104,7 @@
 
 			double ew = settings.EdgeWidth;
 
-			for( int i = 0; i < numFrames; i++ )
+			for( int i = 0; i <= numFrames; i++ )
 			{
 				string numString = i.ToString();
 				numString = numString.PadLeft( 3, '0' );
@@ -120,10 +119,10 @@
 				//settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex2;
 				//mCentering = settings.CenteringMobius();
 				double rot = frac * 2 * Math.PI / 2;
-				settings.ImageRot = -rot;
+				//settings.ImageRot = -rot;
 
 				//mInitOff = OffsetMobius( settings );
-				mInitRot = Mobius.CreateFromIsometry( Geometry.Euclidean, -Math.PI / 4, new Complex() );
+				//mInitRot = Mobius.CreateFromIsometry( Geometry.Euclidean, -Math.PI / 4, new Complex() );
 
 				//m.Isometry( settings.Geometry, Math.PI / 4, pCurrent.ToComplex() );
 				//m.Geodesic( settings.Geometry, pStart.ToComplex(), pCurrent.ToComplex() );
@@ -131,11 +130,13 @@
 
 				// Rotation
 				double xOff = OffsetInModel( settings, 0, 0, 1 );
-				m = RotAboutPoint( settings.Geometry, new Vector3D( 0, 0 ), rot );
+				//m = RotAboutPoint( settings.Geometry, new Vector3D( 0, 0 ), rot );
 				//m = RotAboutPoint( settings.Geometry, new Vector3D( xOff, 0 ),/* -frac * Math.PI*/ -frac * 2 * Math.PI / settings.Q );
 				//m = LimitRot( settings, 0*Math.PI/4, 2*frac );
 				//m = RotAboutPoint( settings.Geometry, new Vector3D(0,0), frac * 2 * Math.PI / settings.P );
 				//m = mList[i];
+
+				m = FinalAnim( settings, frac * 5 );
 
 				settings.Anim = frac;// Util.Smoothed( frac, 1.0 );
 
@@ -223,6 +224,91 @@
 			m1.Isometry( g, 0, p );
 			m2.Isometry( g, rot, new Complex() );
 			return m1 * m2 * m1.Inverse();
+		}
+
+		static public Mobius FinalAnim( Tiler.Settings settings, double t )
+		{
+			// Some points we'll use.
+			Vector3D z1 = new Vector3D( 1, 0 ), z2 = z1, z3 = z1;
+			z2.RotateXY( Math.PI / 6 );
+			z3.RotateXY( Math.PI );
+
+			double hRot = Math.PI / 3;
+
+			Mobius m = new Mobius();
+			settings.Init();
+
+			// Step 1
+			if( t <= 1 )
+			{
+				H3.Cell.Edge edge = settings.UniformEdges[0].Edges[0];
+				Vector3D t1 = edge.Start;
+				Vector3D t2 = edge.End;
+
+				double initialRot = -Math.PI / 2;
+				Mobius mRot = new Mobius();
+				mRot.Isometry( Geometry.Euclidean, initialRot, new Complex() );
+				Mobius test = HyperbolicModels.Upper * mRot;
+
+				Vector3D t1_ = test.Apply( t1 );
+				Vector3D t2_ = test.Apply( t2 );
+
+				double off = ( t2_ - t1_ ).X;
+				off = Util.Smoothed( t, off );
+				t1_.X -= off;
+				t2_.X -= off;
+
+				t1_ = test.Inverse().Apply( t1_ );
+				t2_ = test.Inverse().Apply( t2_ );
+
+				m.MapPoints( t1, t2, z3, t1_, t2_, z3 );
+			}
+
+			// Step 2
+			else if( t <= 2 )
+			{
+				Vector3D w1 = z1, w2 = z2, w3 = z3;
+				double off = Util.Smoothed( t - 1, 1 );
+				w2.RotateXY( hRot * off );
+
+				m.MapPoints( z1, z2, z3, w1, w2, w3 );
+			}
+
+			// Step 3
+			else if ( t <= 4 )
+			{
+				Vector3D w1 = z1, z2_ = z2, w2 = z2, w3 = z3;
+				double off = Util.Smoothed( (t - 2) / 2, 1 );
+
+				z2_.RotateXY( hRot );
+				w2.RotateXY( 2 * hRot );
+				w2.RotateXY( -2 * hRot * off );
+
+				w1.RotateXY( off * 2 * Math.PI );
+				w2.RotateXY( off * 2 * Math.PI );
+				w3.RotateXY( off * 2 * Math.PI );
+
+				m.MapPoints( z1, z2_, z3, w1, w2, w3 );
+			}
+
+			// Step 4
+			else
+			{
+				Vector3D w1 = z1, w2 = z2, w3 = z3;
+				double off = Util.Smoothed( t - 4, 1 );
+
+				z2.RotateXY( hRot );
+				z2.RotateXY( -hRot * off );
+
+				m.MapPoints( z1, z2, z3, w1, w2, w3 );
+			}
+
+			return m.Inverse(); // Why do I need to use inverse here?
+		}
+
+		static public double Sigmoid( double x )
+		{
+			return DonHatch.tanh( x );
 		}
 	}
 }

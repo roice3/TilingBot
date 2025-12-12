@@ -1187,7 +1187,13 @@
 
 						lock( m_lock )
 						{
-							image.SetPixel( i, j, ColorUtil.AvgColor( colors ) );
+							// Take the number of unique to show pixel "importance"
+							int unique = colors.Distinct().Count();
+							double l = (double)unique / Math.Pow( div + 1, 2 );
+							Color c = ColorUtil.AdjustL( Color.Black, l );
+							image.SetPixel( i, j, c );
+
+							//image.SetPixel( i, j, ColorUtil.AvgColor( colors ) );
 						}
 					}
 					else
@@ -1365,7 +1371,11 @@
 						v = Vector3D.FromComplex( 
 							Schwarz_Christoffel.inversesc( v.ToComplex(), m_settings.SchwarzChristoffelPolygon ) );
 						break;
-						}
+                    case HyperbolicModel.Parabola:
+                        //v.X /= Math.Pow( 1.5, 2 );  // Magic number here must match height/width value in Program.cs.
+                        v = HyperbolicModels.ParabolaToPoincare(v);
+                        break;
+                    }
 					break;
 				}
 			}
@@ -1427,9 +1437,12 @@
 
 		private static Color bgColor = Color.FromArgb( 0, 255, 255, 255 );
 
-		private bool OutsideBoundary( Settings settings, Vector3D v, out Color color )
-		{
-			if( settings.Geometry == Geometry.Hyperbolic &&
+        private bool OutsideBoundary(Settings settings, Vector3D v, out Color color)
+        {
+			color = bgColor;
+			//return false;
+
+            if ( settings.Geometry == Geometry.Hyperbolic &&
 				settings.HyperbolicModel == HyperbolicModel.Ring )
 			{
 				Vector3D v1 = HyperbolicModels.BandToRing( new Vector3D( 0, 1 ), settings.PeriodBand, settings.RingRepeats );
@@ -1484,11 +1497,17 @@
 						double b = m_settings.Anim;
 						compare = Math.Abs( v.X* v.X / ( a * a ) + v.Y * v.Y / ( b * b ) );
 					}*/
+                    else if( settings.HyperbolicModel == HyperbolicModel.Parabola )
+                    {
+                        //compare = ( v.Y ) / ( v.X * v.X );
+						compare = HyperbolicModels.ParabolaToPoincare( v ).Abs();
+                    }
 				}
 
 				if( compare > 1.00133 )
 				{
 					color = bgColor;
+					color = Color.White;
 					return true;
 				}
 
@@ -1891,14 +1910,19 @@
 			if( hexagonColoring )
 			{
 				int incrementsUntilRepeat = 40; //30;
-				int offset = 4; //18;
+				double offset = 4; //18;
 				if( settings.ColoringData != null && settings.ColoringData.Length == 3 )
 				{
 					incrementsUntilRepeat = settings.ColoringData[1];
 					offset = settings.ColoringData[2];
 				}
-				int count = settings.ShowCoxeter ? reflections : flips[2];
-				whitish = ColorUtil.ColorAlongHexagon( incrementsUntilRepeat, count + offset );
+
+				// This seems wrong! Should always be across cells, i.e. flips[2];
+				int count = flips[2];// settings.ShowCoxeter ? reflections : flips[2];
+
+
+				whitish = ColorUtil.ColorAlongHexagon( incrementsUntilRepeat, offset + count );
+				darkish = ColorUtil.ColorAlongHexagon( incrementsUntilRepeat, offset + count + 0.25 );
 				/*Color edgeColor = ColorUtil.Inverse( whitish );
 				if( colors.Count > 0 )
 					return edgeColor;
@@ -1912,7 +1936,16 @@
 				return whitish;
 
 			return reflections % 2 == 0 ? whitish : darkish;
-			//return flips[0] % 2 == 0 ? Color.Black : Color.White;	// Checkerboard
+
+
+			//return flips[2] % 2 == 0 ? Color.Black : Color.White;	// Checkerboard
+			bool reflect = flips[2] % 2 == 0;
+			if( flips[1] % 2 == 0 )
+				reflect = !reflect;
+			if( flips[0] % 2 == 0 )
+				reflect = !reflect;
+			return reflect ? Color.White : Color.Black;
+
 		}
 
 		private static void GetAnimParams( Settings settings, out int layer, out int mod, out double frac )

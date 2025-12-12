@@ -20,6 +20,10 @@
 
 		static void Main( string[] args )
 		{
+			//Quilt quilt = new Quilt();
+			//quilt.Generate();
+			//return;
+
 			try
 			{
 				bool tweet = false;
@@ -295,29 +299,34 @@
 			settings.EdgeWidth = RandDouble( rand, 0, .05 );
 			settings.VertexWidth = RandDouble( rand, 0, .1 );
 
-			int centering = 1 + RandIntWeighted( rand, new int[] { 40, 10, 10, 10, 10 } );
-			switch( centering )
-			{
-			case 1:
-				settings.Centering = Tiler.Centering.General;
-				break;
-			case 2:
-				settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex1;
-				break;
-			case 3:
-				settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex2;
-				break;
-			case 4:
-				settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex3;
-				break;
-			case 5:
-				settings.Centering = Tiler.Centering.Vertex;
-				break;
-			}
+			RandomizeCentering( settings, rand );
 
 			settings.ShowCoxeter = RandBoolWeighted( rand, .7 );
 			RandomizeColors( settings, rand );
 			RandomModelAndMobius( settings, rand );
+		}
+
+		internal static void RandomizeCentering( Tiler.Settings settings, Random rand )
+		{
+			int centering = 1 + RandIntWeighted( rand, new int[] { 40, 10, 10, 10, 10 } );
+			switch( centering )
+			{
+				case 1:
+					settings.Centering = Tiler.Centering.General;
+					break;
+				case 2:
+					settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex1;
+					break;
+				case 3:
+					settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex2;
+					break;
+				case 4:
+					settings.Centering = Tiler.Centering.Fundamental_Triangle_Vertex3;
+					break;
+				case 5:
+					settings.Centering = Tiler.Centering.Vertex;
+					break;
+			}
 		}
 
 		internal static void RandomModelAndMobius( Tiler.Settings settings, Random rand )
@@ -405,7 +414,13 @@
 		internal static void StandardInputs( Tiler.Settings settings )
 		{
 			settings.Antialias = Test.IsTesting ? false : true;
-			int size = Test.IsTesting ? 500 : 1200;
+			int size = Test.IsTesting ? 500 : 2500;
+
+			//////////////////////////////////
+			size = 50;
+			settings.Antialias = true;
+			settings.Bounds = 1.1; // 2.5;
+
 			settings.Width = size;
 			settings.Height = size;
 
@@ -439,7 +454,7 @@
 					settings.Height = (int)( settings.Height / factor );
 					settings.Width = (int)( settings.Width * factor );
 				}
-				break;
+                break;
 			}
 		}
 
@@ -447,6 +462,7 @@
 		{
 			// Default if not otherwise specified.
 			double diskBounds = 1.01;
+			diskBounds = 1.0;
 			settings.Bounds = diskBounds;
 
 			switch( settings.Geometry )
@@ -478,7 +494,9 @@
 					settings.Bounds = 3;
 				else if( settings.HyperbolicModel == HyperbolicModel.Joukowsky )
 					settings.Bounds = 1.5;
-				break;
+                else if (settings.HyperbolicModel == HyperbolicModel.Parabola)
+                    settings.Bounds = 250;
+                break;
 			}
 		}
 
