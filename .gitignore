@@ -1,5 +1,7 @@
 
 *.suo
+R3.Core/obj
+R3.Core/bin
 TilingBot/.vs
 TilingBot/obj
 TilingBot/bin
